@@ -32,12 +32,17 @@ class Position:
     def __add__(self, other):
         if isinstance(other, tuple):
             return Position(self.x + other[0], self.y + other[1])
-        return Position(self.x + other.x, self.y + other.y)
+        else:
+            return Position(self.x + other.x, self.y + other.y)
 
     def __sub__(self, other):
         if isinstance(other, tuple):
             return Position(self.x - other[0], self.y - other[1])
-        return Position(self.x - other.x, self.y - other.y)
+        else:
+            return Position(self.x - other.x, self.y - other.y)
+
+    def __repr__(self):
+        return 'Position({}, {})'.format(self._x, self._y)
 
 
 @enum.unique
@@ -115,6 +120,7 @@ class Board:
         def neighbour(self, dir):
             # type: (Direction) -> Optional[Cell]
             # TODO
+            pass
 
         def __str__(self):
             walls = ''.join([
@@ -131,17 +137,29 @@ class Board:
         self.reserved_height = max_height * 2 - 1
         self.reserved_width = max_width * 2 - 1
 
+        self.min_x = -max_width + 1
+        self.min_y = -max_height + 1
+        self.min_pos = Position(self.min_x, self.min_y)
+        self.max_x = max_width - 1
+        self.max_y = max_height - 1
+        self.max_pos = Position(self.max_x, self.max_y)
+
         self._explored = [[False] * self.reserved_height] * self.reserved_width
-        self._walls = [Wall.Unknown] * (max_height * 2 + 1) * (max_width * 2 + 1)
+        self._walls = [Wall.Unknown] * (
+                (self.reserved_width + 1) * self.reserved_height +
+                (self.reserved_height + 1) * self.reserved_width
+        )
 
     def _wall_index(self, pos: Position, dir: Direction) -> int:
+        x = pos.x - self.min_x
+        y = pos.y - self.min_y
         if dir in (Direction.West, Direction.East):
-            idx = pos.x + pos.y * (self.reserved_width + 1)
+            idx = x + y * (self.reserved_width + 1)
             if dir == Direction.East:
                 idx += 1
         else:
             offset = (self.reserved_width + 1) * self.reserved_height
-            idx = offset + pos.y + pos.x * (self.reserved_width + 1)
+            idx = offset + y + x * (self.reserved_width + 1)
             if dir == Direction.South:
                 idx += 1
         return idx
@@ -161,4 +179,60 @@ class Bot:
         if isinstance(dir, RelativeDirection):
             dir = self.dir.apply_relative(dir)
         return self.board[self.pos].wall(dir)
+
+
+class TerminalView:
+    HorizontalWalls = {
+        Wall.Unknown: '\x1B[2m─?─\x1B[22m',
+        Wall.Yes: '━━━',
+        Wall.No: '   '
+    }
+    VerticalWalls = {
+        Wall.Unknown: '\x1B[2m?\x1B[22m',
+        Wall.Yes: '┃',
+        Wall.No: ' '
+    }
+
+    def __init__(self, board: Board, bot: Bot):
+        #self.clear()
+        for y in range(board.min_y, board.max_y + 1):
+            if y == board.min_y:
+                print('┌' + self.HorizontalWalls[board[
+                    Position(board.min_x, y)].wall(Direction.North)], end='')
+                for x in range(board.min_x + 1, board.max_x + 1):
+                    print('┬' + self.HorizontalWalls[board[
+                        Position(x, y)].wall(Direction.North)], end='')
+                print('┐', end='')
+            else:
+                print('├' + self.HorizontalWalls[board[
+                    Position(board.min_x, y)].wall(Direction.North)], end='')
+                for x in range(board.min_x + 1, board.max_x + 1):
+                    print('┼' + self.HorizontalWalls[board[
+                        Position(x, y)].wall(Direction.North)], end='')
+                print('┤', end='')
+            print('')
+            for x in range(board.min_x, board.max_x + 1):
+                char = ' '
+                if x == bot.pos.x and y == bot.pos.y:
+                    char = {
+                        Direction.North: '↑',
+                        Direction.East: '→',
+                        Direction.South: '↓',
+                        Direction.West: '←',
+                        Direction.Unknown: '?'
+                    }[bot.dir]
+                print(self.VerticalWalls[board[
+                    Position(x, y)].wall(Direction.West)] + ' {} '.format(char), end='')
+            print(self.VerticalWalls[board[
+                Position(board.max_x, y)].wall(Direction.East)])
+        print('└' + self.HorizontalWalls[board[
+            Position(board.min_x, board.max_y)].wall(Direction.South)], end='')
+        for x in range(board.min_x + 1, board.max_x + 1):
+            print('┴' + self.HorizontalWalls[board[
+                Position(x, board.max_y)].wall(Direction.South)], end='')
+        print('┘')
+
+    @staticmethod
+    def clear():
+        print('\x1Bc', end='', flush=True)
 
