@@ -2,6 +2,13 @@
 # Created by https://www.gitignore.io/api/vim,emacs,python,pycharm,visualstudiocode
 # Edit at https://www.gitignore.io/?templates=vim,emacs,python,pycharm,visualstudiocode
 
+#Dossier de code robot
+/parcoursRobot96/
+/parcoursRobot97/
+/parcoursRobot135/
+/parcours/
+/temp/
+
 ### Emacs ###
 # -*- mode: gitignore; -*-
 *~
