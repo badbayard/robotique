@@ -1,6 +1,6 @@
 import enum
 try:
-    from typing import Union, Optional
+    from typing import Union, Optional, List
 except ImportError:
     pass
 
@@ -105,11 +105,11 @@ class Board:
 
         @property
         def explored(self) -> bool:
-            return self.board._explored[self.pos.x][self.pos.y]
+            return self.board._explored[self.board._cell_index(self.pos)]
 
         @explored.setter
         def explored(self, e: bool):
-            self.board._explored[self.pos.x][self.pos.y] = e
+            self.board._explored[self.board._cell_index(self.pos)] = e
 
         def wall(self, dir: Direction) -> Wall:
             return self.board._walls[self.board._wall_index(self.pos, dir)]
@@ -118,9 +118,29 @@ class Board:
             self.board._walls[self.board._wall_index(self.pos, dir)] = wall
 
         def neighbour(self, dir):
-            # type: (Direction) -> Optional[Cell]
-            # TODO
-            pass
+            # type: (Direction) -> Optional['Cell']
+            try:
+                return self.board[self.pos + {
+                    Direction.North: (0, -1),
+                    Direction.East: (1, 0),
+                    Direction.South: (0, 1),
+                    Direction.West: (-1, 0)
+                }[dir]]
+            except IndexError:
+                return None
+
+        @property
+        def accessible_neighbours(self, strict=False):
+            # type: (bool) -> List['Cell']
+            acc = []
+            for dir in [Direction.North, Direction.East,
+                        Direction.South, Direction.West]:
+                if self.wall(dir) in (
+                        [Wall.Yes] if strict else [Wall.Yes, Wall.Unknown]):
+                    neigh = self.neighbour(dir)
+                    if neigh is not None:
+                        acc.append(neigh)
+            return acc
 
         def __str__(self):
             walls = ''.join([
@@ -144,11 +164,16 @@ class Board:
         self.max_y = max_height - 1
         self.max_pos = Position(self.max_x, self.max_y)
 
-        self._explored = [[False] * self.reserved_height] * self.reserved_width
+        self._explored = [False] * (self.reserved_height * self.reserved_width)
         self._walls = [Wall.Unknown] * (
                 (self.reserved_width + 1) * self.reserved_height +
                 (self.reserved_height + 1) * self.reserved_width
         )
+
+    def _cell_index(self, pos: Position) -> int:
+        x = pos.x - self.min_x
+        y = pos.y - self.min_y
+        return x + y * self.reserved_width
 
     def _wall_index(self, pos: Position, dir: Direction) -> int:
         x = pos.x - self.min_x
@@ -165,6 +190,9 @@ class Board:
         return idx
 
     def __getitem__(self, key: Position):
+        if not (self.min_x <= key.x <= self.max_x) or \
+           not (self.min_y <= key.y <= self.max_y):
+            return IndexError
         return self.Cell(self, key)
 
 
@@ -194,7 +222,13 @@ class TerminalView:
     }
 
     def __init__(self, board: Board, bot: Bot):
-        #self.clear()
+        # self.clear()
+        self.board = board
+        self.bot = bot
+
+    def display(self):
+        board = self.board
+        bot = self.bot
         for y in range(board.min_y, board.max_y + 1):
             if y == board.min_y:
                 print('┌' + self.HorizontalWalls[board[
@@ -212,17 +246,20 @@ class TerminalView:
                 print('┤', end='')
             print('')
             for x in range(board.min_x, board.max_x + 1):
-                char = ' '
+                char = '   '
                 if x == bot.pos.x and y == bot.pos.y:
                     char = {
-                        Direction.North: '↑',
-                        Direction.East: '→',
-                        Direction.South: '↓',
-                        Direction.West: '←',
-                        Direction.Unknown: '?'
+                        Direction.North: ' ↑ ',
+                        Direction.East: ' → ',
+                        Direction.South: ' ↓ ',
+                        Direction.West: ' ← ',
+                        Direction.Unknown: ' ? '
                     }[bot.dir]
-                print(self.VerticalWalls[board[
-                    Position(x, y)].wall(Direction.West)] + ' {} '.format(char), end='')
+                cell = board[Position(x, y)]
+                color = ''  # if cell.explored else '\x1B[100m'
+                if not cell.explored:
+                    char = '\x1B[2m - '
+                print(self.VerticalWalls[cell.wall(Direction.West)] + '{}{}\x1B[49m\x1B[22m'.format(color, char), end='')
             print(self.VerticalWalls[board[
                 Position(board.max_x, y)].wall(Direction.East)])
         print('└' + self.HorizontalWalls[board[
@@ -236,3 +273,14 @@ class TerminalView:
     def clear():
         print('\x1Bc', end='', flush=True)
 
+
+if __name__ == '__main__':
+    import time
+    b = Board(3, 3)
+    bot = Bot(b)
+    tv = TerminalView(b, bot)
+    b[Position(0, 0)].explored = True
+    for x in range(len(b._walls)):
+        b._walls[x] = Wall.Yes
+        tv.display()
+        time.sleep(0.3)
