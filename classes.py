@@ -196,6 +196,27 @@ class Board:
         return self.Cell(self, key)
 
 
+@enum.unique
+class BoardColor(enum.Enum):
+    Unknown = '?'
+    Red = 'Red'
+    Wood = 'Wood'
+    Black = 'Black'
+    White = 'White'
+
+    @classmethod
+    def from_itensity(cls, inten: int) -> 'BoardColor':
+        if inten <= 20:
+            return cls.Black
+        elif 50 <= inten <= 65:
+            return cls.Wood
+        elif 70 <= inten <= 85:
+            return cls.Red
+        elif inten >= 90:
+            return cls.White
+        return cls.Unknown
+
+
 class Bot:
     def __init__(self, board: Board):
         self.board = board
@@ -275,7 +296,16 @@ class TerminalView:
 
 
 if __name__ == '__main__':
-    import time
+    import time, sys
+
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+
     b = Board(3, 3)
     bot = Bot(b)
     tv = TerminalView(b, bot)
