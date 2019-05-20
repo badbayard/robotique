@@ -1,4 +1,4 @@
-#! etc/bin/env python3
+#!/usr/bin/env python3
 from ev3dev.ev3 import *
 from time import sleep, time
 from classes import BoardColor, Direction, RelativeDirection

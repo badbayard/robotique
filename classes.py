@@ -44,6 +44,14 @@ class Position:
     def __repr__(self):
         return 'Position({}, {})'.format(self._x, self._y)
 
+    def move(self, dir: 'Direction') -> 'Position':
+        delta = {
+            Direction.North: (0, -1),
+            Direction.East: (1, 0),
+            Direction.South: (0, 1),
+            Direction.West: (-1, 0)
+        }.get(dir)
+        return Position(self._x + delta[0], self._y + delta[1])
 
 @enum.unique
 class RelativeDirection(enum.Enum):
@@ -195,6 +203,10 @@ class Board:
             return IndexError
         return self.Cell(self, key)
 
+    def __contains__(self, pos: Position):
+        return self.min_x <= pos.x <= self.max_x and \
+               self.min_y <= pos.y <= self.max_y
+
 
 @enum.unique
 class BoardColor(enum.Enum):
@@ -217,6 +229,14 @@ class BoardColor(enum.Enum):
         return cls.Unknown
 
 
+DirectionColorMap = {
+    Direction.North: (BoardColor.Red, BoardColor.Black),
+    Direction.East: (BoardColor.Black, BoardColor.White),
+    Direction.South: (BoardColor.Black, BoardColor.Red),
+    Direction.West: (BoardColor.White, BoardColor.Black)
+}
+
+
 class Bot:
     def __init__(self, board: Board):
         self.board = board
@@ -228,6 +248,21 @@ class Bot:
         if isinstance(dir, RelativeDirection):
             dir = self.dir.apply_relative(dir)
         return self.board[self.pos].wall(dir)
+
+    def forward(self, count: int = 1, *args, **kwargs) -> None:
+        for _ in range(count):
+            nextpos = self.pos.move(self.dir)
+            if nextpos not in self.board:
+                raise ValueError("Moved too far")
+            self.pos = nextpos
+
+    def backward(self, count: int = 1, *args, **kwargs) -> None:
+        dir = self.dir.apply_relative(RelativeDirection.Back)
+        for _ in range(count):
+            nextpos = self.pos.move(dir)
+            if nextpos not in self.board:
+                raise ValueError("Moved too far")
+            self.pos = nextpos
 
 
 class TerminalView:
