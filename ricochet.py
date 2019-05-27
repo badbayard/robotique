@@ -1,6 +1,7 @@
 from ev3dev.ev3 import *
 import ev3dev.ev3 as ev3
 from time import sleep
+from typing import Callable
 
 NORTH = 0x01
 EAST = 0x02
@@ -19,11 +20,15 @@ MAX_DEPTH = 32
 
 
 def HAS_WALL(x, wall):
-    return x & wall
+    x & wall
 
 
 def HAS_ROBOT(x):
-    return x & ROBOT
+    x & ROBOT
+
+
+def SET_ROBOT(x):
+    x |= ROBOT
 
 
 def UNSET_ROBOT(x):
@@ -31,24 +36,23 @@ def UNSET_ROBOT(x):
 
 
 def PACK_MOVE(robot, direction):
-    return robot << 4 | direction
+    robot << 4 | direction
 
 
-def PACK_UNDO(robot, start, last):
-    return robot << 16 | start << 8 | last
+def PACK_UNDO(robot, start, last):\
+    robot << 16 | start << 8 | last
 
 
 def UNPACK_ROBOT(undo):
-    return (undo >> 16) & 0xff
+    (undo >> 16) & 0xff
 
 
 def UNPACK_START(undo):
-    return (undo >> 8) & 0xff
-
+    (undo >> 8) & 0xff
 
 
 def UNPACK_LAST(undo):
-    return undo & 0xff
+    undo & 0xff
 
 
 class Game:
@@ -60,11 +64,7 @@ class Game:
 
 
 class Entry:
-    def __init__(self):
-        self.key = 0
-        self.depth = 0
-
-    def __init__(self,Nkey,Ndepth):
+    def __init__(self, Nkey=0, Ndepth=0):
         self.key = Nkey
         self.depth = Ndepth
 
@@ -128,7 +128,7 @@ def can_move(game: Game, robot: int, direction: int) -> bool:
 
 def compute_move(game: Game,robot: int, direction: int) ->int :
     index = game.robots[robot] + OFFSET[direction]
-    while true:
+    while True:
         if HAS_WALL(game.grid[index], direction):
             break
 
@@ -147,8 +147,8 @@ def do_move(game: Game, robot: int, direction: int) -> int:
     last = game.last
     game.robots[robot] = end
     game.last = PACK_MOVE(robot, direction)
-    game.grid[start] &= ~ROBOT
-    game.grid[end] |= ROBOT
+    UNSET_ROBOT(game.grid[start])
+    SET_ROBOT(game.grid[end])
     return PACK_UNDO(robot, start, last)
 
 
@@ -159,9 +159,8 @@ def undo_move (game: Game, undo: int):
     end = game.robots[robot]
     game.robots[robot] = start
     game.last = last
-    game.grid[start] |= ROBOT
-
-    game.grid[end] &= ~ROBOT
+    SET_ROBOT(game.grid[start])
+    UNSET_ROBOT(game.grid[end])
 
 
 def precompute_minimum_moves(game: Game):
@@ -193,7 +192,7 @@ _hits = 0
 _inner = 0
 
 
-def _search(game: Game, depth: int, max_depth: int, path: char, set :Set):
+def _search(game: Game, depth: int, max_depth: int, path: chr):
     global _nodes
     _nodes += 1
     if game_over(game):
@@ -206,10 +205,10 @@ def _search(game: Game, depth: int, max_depth: int, path: char, set :Set):
     if game.moves[game.robots[0]] > height:
         return 0
 
-    if height != 1 and not set_add(set, make_key(game), height):
-        global _hits
-        _hits += 1
-        return 0
+    # if height != 1 and not set_add(set, make_key(game), height):
+    #     global _hits
+    #     _hits += 1
+    #     return 0
 
     global _inner
     _inner += 1
@@ -222,8 +221,8 @@ def _search(game: Game, depth: int, max_depth: int, path: char, set :Set):
                 continue
 
             undo = do_move(game, robot, direction)
-            uresult = _search(
-                game, depth + 1, max_depth, path, set
+            result = _search(
+                game, depth + 1, max_depth, path
             )
             undo_move(game, undo)
             if result:
@@ -233,7 +232,7 @@ def _search(game: Game, depth: int, max_depth: int, path: char, set :Set):
 
 
 #j'ai ommis tous les appel à Set (préexistant en python)
-def search(game: Game, path: char, callback: Callable[[int, int, int, int], None]):
+def search(game: Game, path: chr , callback: Callable[[int, int, int, int], None]):
     if game_over(game):
         return 0
     result = 0
