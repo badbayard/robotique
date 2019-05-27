@@ -232,3 +232,41 @@ def _search(game: Game, depth: int, max_depth: int, path: char, set :Set):
                 path[depth] = PACK_MOVE(robot, direction)
                 return result
     return 0
+
+
+#j'ai ommis tous les appel à Set (préexistant en python)
+def search(game: Game, path: char, callback: Callable[[int, int, int, int], None]):
+    if game_over(game):
+        return 0
+    result = 0
+    precompute_minimum_moves(game)
+    for max_depth in range(1, MAX_DEPTH):
+        global _nodes
+        global _hits
+        global _inner
+        _nodes = 0
+        _hits = 0
+        _inner = 0
+        result = _search(game, 0, max_depth, path)
+        if callback:
+            callback(max_depth, _nodes, _inner, _hits)
+        if result:
+            break
+    return result
+
+
+def _callback(depth, nodes, inner,  hits):
+    print (depth, nodes, inner, hits)
+
+
+if __name__ == "__main__":
+    game = {
+        {0},
+        {0},
+        {196, 197, 135},
+        # encore un peu flou le principe de token
+        54,
+        0
+    }
+    path = [] * 32
+    search(game, path, _callback)
