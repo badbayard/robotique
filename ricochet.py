@@ -61,9 +61,24 @@ def hash(key: int) -> int:
     return key
 
 
-def set_alloc(set: set, count: int):
-    for i in count:
-        set.mask = 0xfff
-        set.size = 0
-        set.data = Entry(set.mask + 1, sys.getsizeof(Entry))
-        set += 1
+def game_over(game: Game) -> bool:
+    if game.robots[0] == game.token:
+        return true;
+
+    else:
+        return false;
+
+
+def can_move(game: Game, robot: int, direction: int) -> bool:
+    index = game.robots[robot]
+    if HAS_WALL(game.grid[index], direction):
+        return false;
+
+    if game.last == PACK_MOVE(robot, REVERSE[direction]):
+        return false;
+
+    new_index = index + OFFSET[direction]
+    if HAS_ROBOT(game.grid[new_index]):
+        return false
+
+    return true
