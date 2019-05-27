@@ -46,9 +46,16 @@ def swap(array, a , b):
     array[b] = temp
 
 
+def MAKE_KEY(x):
+    x = (x[0] | (x[1] << 8) | (x[2]<< 16) ) 
+
+
 def make_key():
     global Game
-    robots = [0] * 4
+    robots = [0] * 3
+    if robots[1] > robots[2]:
+        swap(robots,1,2)
+    return MAKE_KEY(robots)
 
 
 def hash(key: int) -> int:
