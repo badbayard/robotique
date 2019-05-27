@@ -14,6 +14,44 @@ OFFSET = [0,-16,1,0,16,0,0,0,-1]
 # Game = (grid[256],moves[256],robots[4],token,last)
 # Entry = (key,depth)
 # Set = (mask,size)
+#
+MAX_DEPTH = 32
+
+
+def HAS_WALL(x, wall):
+    x & wall
+
+
+def HAS_ROBOT(x):
+    x & ROBOT
+
+
+def SET_ROBOT(x):
+    x |= ROBOT
+
+
+def UNSET_ROBOT(x):
+    x &= ~ROBOT
+
+
+def PACK_MOVE(robot, direction):
+    robot << 4 | direction
+
+
+def PACK_UNDO(robot, start, last):\
+    robot << 16 | start << 8 | last
+
+
+def UNPACK_ROBOT(undo):
+    (undo >> 16) & 0xff
+
+
+def UNPACK_START(undo):
+    (undo >> 8) & 0xff
+
+
+def UNPACK_LAST(undo):
+    undo & 0xff
 
 
 class Game:
