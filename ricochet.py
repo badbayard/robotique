@@ -109,3 +109,14 @@ def do_move(game: Game, robot: int, direction: int) -> int:
     SET_ROBOT(game.grid[end])
     return PACK_UNDO(robot, start, last)
 
+
+def undo_move (game: Game, undo: int):
+    robot = UNPACK_ROBOT(undo)
+    start = UNPACK_START(undo)
+    last = UNPACK_LAST(undo)
+    end = game.robots[robot]
+    game.robots[robot] = start
+    game.last = last
+    SET_ROBOT(game.grid[start])
+    UNSET_ROBOT(game.grid[end])
+
