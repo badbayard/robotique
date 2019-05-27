@@ -179,14 +179,56 @@ def precompute_minimum_moves(game: Game):
             if not status[i]:
                 continue
 
-            status[i] = false
+            status[i] = False
             depth = game.moves[i] + 1
-            for direction in range(1,8):
+            for direction in range(1, 8):
                 index = i
                 while not HAS_WALL(game.grid[index], direction):
                     if game.moves[index] > depth:
                         game.moves[index] = depth
-                        status[index] = true
-                        done = false
+                        status[index] = True
+                        done = False
 
 
+_nodes = 0
+_hits = 0
+_inner = 0
+
+
+def _search(game: Game, depth: int, max_depth: int, path: char, set :Set):
+    global _nodes
+    _nodes += 1
+    if game_over(game):
+        return depth
+
+    if depth == max_depth:
+        return 0
+
+    height = max_depth - depth
+    if game.moves[game.robots[0]] > height:
+        return 0
+
+    if height != 1 and not set_add(set, make_key(game), height):
+        global _hits
+        _hits += 1
+        return 0
+
+    global _inner
+    _inner += 1
+    for robot in range(4):
+        if robot and game.moves[game.robots[0]] == height:
+            continue
+
+        for direction in range(1, 8):
+            if not can_move(game, robot, direction):
+                continue
+
+            undo = do_move(game, robot, direction)
+            uresult = _search(
+                game, depth + 1, max_depth, path, set
+            )
+            undo_move(game, undo)
+            if result:
+                path[depth] = PACK_MOVE(robot, direction)
+                return result
+    return 0
