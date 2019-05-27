@@ -55,10 +55,6 @@ def make_key():
     robots = [0] * 3
     if robots[1] > robots[2]:
         swap(robots,1,2)
-    if robots[2] > robots[3]:
-        swap(robots,2,3)
-    if robots[1] > robots[2]:
-        swap(robots,1,2)
     return MAKE_KEY(robots)
 
 
