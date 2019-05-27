@@ -264,6 +264,12 @@ class Bot:
                 raise ValueError("Moved too far")
             self.pos = nextpos
 
+    def turn_left(self, *args, **kwargs):
+        self.dir = self.dir.apply_relative(RelativeDirection.Left)
+
+    def turn_right(self, *args, **kwargs):
+        self.dir = self.dir.apply_relative(RelativeDirection.Right)
+
 
 class TerminalView:
     HorizontalWalls = {
