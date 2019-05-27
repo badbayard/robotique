@@ -19,15 +19,11 @@ MAX_DEPTH = 32
 
 
 def HAS_WALL(x, wall):
-    x & wall
+    return x & wall
 
 
 def HAS_ROBOT(x):
-    x & ROBOT
-
-
-def SET_ROBOT(x):
-    x |= ROBOT
+    return x & ROBOT
 
 
 def UNSET_ROBOT(x):
@@ -35,23 +31,24 @@ def UNSET_ROBOT(x):
 
 
 def PACK_MOVE(robot, direction):
-    robot << 4 | direction
+    return robot << 4 | direction
 
 
-def PACK_UNDO(robot, start, last):\
-    robot << 16 | start << 8 | last
+def PACK_UNDO(robot, start, last):
+    return robot << 16 | start << 8 | last
 
 
 def UNPACK_ROBOT(undo):
-    (undo >> 16) & 0xff
+    return (undo >> 16) & 0xff
 
 
 def UNPACK_START(undo):
-    (undo >> 8) & 0xff
+    return (undo >> 8) & 0xff
+
 
 
 def UNPACK_LAST(undo):
-    undo & 0xff
+    return undo & 0xff
 
 
 class Game:
@@ -150,8 +147,8 @@ def do_move(game: Game, robot: int, direction: int) -> int:
     last = game.last
     game.robots[robot] = end
     game.last = PACK_MOVE(robot, direction)
-    UNSET_ROBOT(game.grid[start])
-    SET_ROBOT(game.grid[end])
+    game.grid[start] &= ~ROBOT
+    game.grid[end] |= ROBOT
     return PACK_UNDO(robot, start, last)
 
 
@@ -162,8 +159,9 @@ def undo_move (game: Game, undo: int):
     end = game.robots[robot]
     game.robots[robot] = start
     game.last = last
-    SET_ROBOT(game.grid[start])
-    UNSET_ROBOT(game.grid[end])
+    game.grid[start] |= ROBOT
+
+    game.grid[end] &= ~ROBOT
 
 
 def precompute_minimum_moves(game: Game):
