@@ -82,3 +82,30 @@ def can_move(game: Game, robot: int, direction: int) -> bool:
         return false
 
     return true
+
+
+def compute_move(game: Game,robot: int, direction: int) ->int :
+    index = game.robots[robot] + OFFSET[direction]
+    while true:
+        if HAS_WALL(game.grid[index], direction):
+            break
+
+        new_index = index + OFFSET[direction]
+        if HAS_ROBOT(game.grid[new_index]):
+            break
+
+        index = new_index
+
+    return index
+
+
+def do_move(game: Game, robot: int, direction: int) -> int:
+    start = game.robots[robot]
+    end = compute_move(game, robot, direction)
+    last = game.last
+    game.robots[robot] = end
+    game.last = PACK_MOVE(robot, direction)
+    UNSET_ROBOT(game.grid[start])
+    SET_ROBOT(game.grid[end])
+    return PACK_UNDO(robot, start, last)
+
