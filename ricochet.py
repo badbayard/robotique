@@ -18,8 +18,8 @@ OFFSET = [0,-16,1,0,16,0,0,0,-1]
 
 class Game:
     def __init__(self):
-        self.grid = [0] * 256
-        self.robots = [0] * 4
+        self.grid = [0] * 64
+        self.robots = [0] * 3
         self.token = 0
         self.last = 0
 
@@ -63,25 +63,25 @@ def hash(key: int) -> int:
 
 def game_over(game: Game) -> bool:
     if game.robots[0] == game.token:
-        return true;
+        return True
 
     else:
-        return false;
+        return False
 
 
 def can_move(game: Game, robot: int, direction: int) -> bool:
     index = game.robots[robot]
     if HAS_WALL(game.grid[index], direction):
-        return false;
+        return False
 
     if game.last == PACK_MOVE(robot, REVERSE[direction]):
-        return false;
+        return False
 
     new_index = index + OFFSET[direction]
     if HAS_ROBOT(game.grid[new_index]):
-        return false
+        return False
 
-    return true
+    return True
 
 
 def compute_move(game: Game,robot: int, direction: int) ->int :
@@ -119,4 +119,29 @@ def undo_move (game: Game, undo: int):
     game.last = last
     SET_ROBOT(game.grid[start])
     UNSET_ROBOT(game.grid[end])
+
+
+def precompute_minimum_moves(game: Game):
+    status = [False] * 64
+    game.move = [0xffffffff] * 64
+
+    game.moves[game.token] = 0
+    status[game.token] = True
+    done = False
+    while not done:
+        done = True
+        for i  in range(64):
+            if not status[i]:
+                continue
+
+            status[i] = false
+            depth = game.moves[i] + 1
+            for direction in range(1,8):
+                index = i
+                while not HAS_WALL(game.grid[index], direction):
+                    if game.moves[index] > depth:
+                        game.moves[index] = depth
+                        status[index] = true
+                        done = false
+
 
