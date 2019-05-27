@@ -293,3 +293,5 @@ tags
 .history
 
 # End of https://www.gitignore.io/api/vim,emacs,python,pycharm,visualstudiocode
+
+\.idea/
