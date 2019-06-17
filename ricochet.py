@@ -10,7 +10,7 @@ WEST = 0x08
 ROBOT = 0X10
 
 REVERSE = [0 , SOUTH, WEST,0,NORTH,0,0,0,EAST]
-OFFSET = [0,-16,1,0,16,0,0,0,-1]
+OFFSET = []
 
 #Game = (grid[256],moves[256],robots[1],token,last)
 # Entry = (key,depth)
@@ -157,22 +157,23 @@ def undo_move (game: Game, undo: int):
 
 
 def precompute_minimum_moves(game: Game):
-    status = [False] * 64
-    game.move = [0xffffffff] * 64
+    size = len(game.grid)
+    status = [False] * size
+    game.move = [0xffffffff] * 256
 
     game.moves[game.token] = 0
     status[game.token] = True
     done = False
     while not done:
         done = True
-        for i  in range(64):
+        for i  in range(size):
             if not status[i]:
                 continue
 
             status[i] = False
             depth = game.moves[i] + 1
             direction=1
-            for j in range(1, 4):
+            for j in range(1, 5):
                 index = i
                 while not HAS_WALL(game.grid[index], direction):
                     if game.moves[index] > depth:
@@ -181,6 +182,8 @@ def precompute_minimum_moves(game: Game):
                         done = False
                     
                 direction*=2
+    for i in grid.moves
+        print(grid.moves[i])
 
 
 _nodes = 0
@@ -208,13 +211,13 @@ def _search(game: Game, depth: int, max_depth: int, path: chr):
 
     global _inner
     _inner += 1
-    for robot in range(4):
+    for robot in range(3):
         if robot and game.moves[game.robots[0]] == height:
             continue
         
         direction =1
         
-        for i in range(1, 4):
+        for i in range(1, 5):
             if not can_move(game, robot, direction):
                 direction*=2
                 continue
@@ -262,7 +265,8 @@ def _callback(depth, nodes, inner,  hits):
 if __name__ == "__main__":
     game = Game()
     game.grid = [13,8,8,8,9,5,4,0,0,1,4,0,1,0,1,4,0,0,0,1,6,2,2,2,3]
-    game.robots = [196, 197, 135]
+    OFFSET = [0,-1,-5,0,1,0,0,0,5]
+    game.robots = [4, 20, 24]
     game.token = 54
     path = [] * 32
     search(game, path, _callback)
