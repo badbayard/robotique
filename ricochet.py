@@ -171,13 +171,16 @@ def precompute_minimum_moves(game: Game):
 
             status[i] = False
             depth = game.moves[i] + 1
-            for direction in range(1, 8):
+            direction=1
+            for j in range(1, 4):
                 index = i
                 while not HAS_WALL(game.grid[index], direction):
                     if game.moves[index] > depth:
                         game.moves[index] = depth
                         status[index] = True
                         done = False
+                    
+                direction*=2
 
 
 _nodes = 0
