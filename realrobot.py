@@ -36,16 +36,19 @@ class ConsecutiveCounter:
 
 
 class BotCalibration:
-    def __init__(self, color: BoardColorCalibration, pulses_per_cm: float):
+    def __init__(self, color: BoardColorCalibration, pulses_per_cm: float,
+                 pulses_per_90_degrees: float):
         self.color = color
         self.pulses_per_cm = pulses_per_cm
+        self.pulses_per_90_degrees = pulses_per_90_degrees
 
 
 class RealBot(Bot):
     DEFAULT_SPEED = 200
     CORRECT_SPEED = 40
     DEFAULT_ROTATE_SPEED = 100
-    PULSES_PER_DEG = None
+    ROTATE_PULSES_SLOWDOWN = 50
+    ROTATE_PULSES_SLOWDOWN_PER_STAY = 40
     CM_PER_CELL = 30
 
     def __init__(self, motor_l: LargeMotor, motor_r: LargeMotor,
@@ -56,6 +59,8 @@ class RealBot(Bot):
         self.motor_l, self.motor_r = motor_l, motor_r
         self.color_sensor = color_sensor
         self.calibration = calibration
+        self.rotate_stays = 0
+        self.last_rotation_reldir = None
 
     def read_color(self) -> BoardColor:
         return BoardColor.from_itensity(
@@ -63,20 +68,27 @@ class RealBot(Bot):
             self.calibration.color)
 
     def move_cm(self, cm: float, speed: float = DEFAULT_SPEED):
+        self.rotate_stays = 0
         end = self.motor_l.position + self.calibration.pulses_per_cm * cm
         #correct_dir = None
         #supercorrecting = False
         #supercorrecting_start =  None
+        if self.last_rotation_reldir in (RelativeDirection.Left, None):
+            self.motor_l.run_forever(speed_sp=speed - self.CORRECT_SPEED)
+            self.motor_r.run_forever(speed_sp=speed + self.CORRECT_SPEED)
+        else:
+            self.motor_l.run_forever(speed_sp=speed + self.CORRECT_SPEED)
+            self.motor_r.run_forever(speed_sp=speed - self.CORRECT_SPEED)
         while self.motor_l.position <= end:
             col = self.read_color()
-            if col == DirectionColorMap[self.dir][1]:
+            if col == DirectionColorMap[self.dir][1]:  # Correct left
                 #if supercorrecting:
                 #    supercorrecting = False
                 #   end += self.motor_l.position - supercorrecting_start
                 self.motor_l.run_forever(speed_sp=speed - self.CORRECT_SPEED)
                 self.motor_r.run_forever(speed_sp=speed + self.CORRECT_SPEED)
                 #correct_dir = RelativeDirection.Left
-            elif col == DirectionColorMap[self.dir][0]:
+            elif col == DirectionColorMap[self.dir][0]:  # Correcy right
                 #if supercorrecting:
                 #    supercorrecting = False
                 #    end += self.motor_l.position - supercorrecting_start
@@ -117,31 +129,50 @@ class RealBot(Bot):
         self.backward_cm(count * self.CM_PER_CELL, speed)
 
     def turn_left(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
-        self.motor_l.run_to_rel_pos(position_sp=500, speed_sp=-speed)
-        self.motor_r.run_to_rel_pos(position_sp=-500, speed_sp=speed)
+        pulses = kwargs.get("pulses", self.calibration.pulses_per_90_degrees)
+        fast_pulses = pulses - min(
+            pulses,
+            self.ROTATE_PULSES_SLOWDOWN +
+            self.ROTATE_PULSES_SLOWDOWN_PER_STAY * self.rotate_stays)
+        print("FP: " + str(fast_pulses))
+        self.motor_l.run_to_rel_pos(position_sp=-fast_pulses, speed_sp=-speed)
+        self.motor_r.run_to_rel_pos(position_sp=fast_pulses, speed_sp=speed)
+        self.motor_l.wait_until_not_moving()
+        self.motor_r.wait_until_not_moving()
 
-        '''col_counter = ConsecutiveCounter(4)
-        self.rotate_left(speed)
+        col_counter = ConsecutiveCounter(4)
+        self.rotate_left(speed / 2)
         target_dir = self.dir.apply_relative(RelativeDirection.Left)
         target_color = DirectionColorMap[target_dir][1]
-        while not col_counter.triggered_by(BoardColor.Wood):
-            col_counter(self.read_color())
-        while not col_counter.triggered_by(target_color):
-            col_counter(self.read_color())
-        self.stop()
-        self.dir = target_dir'''
-
-    def turn_right(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
-        col_counter = ConsecutiveCounter(4)
-        self.rotate_right(speed)
-        target_dir = self.dir.apply_relative(RelativeDirection.Right)
-        target_color = DirectionColorMap[target_dir][0]
-        while not col_counter.triggered_by(BoardColor.Wood):
-            col_counter(self.read_color())
         while not col_counter.triggered_by(target_color):
             col_counter(self.read_color())
         self.stop()
         self.dir = target_dir
+        self.last_rotation_reldir = RelativeDirection.Left
+        self.rotate_stays += 1
+
+    def turn_right(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
+        pulses = kwargs.get("pulses", self.calibration.pulses_per_90_degrees)
+        fast_pulses = pulses - min(
+            pulses,
+            self.ROTATE_PULSES_SLOWDOWN +
+            self.ROTATE_PULSES_SLOWDOWN_PER_STAY * self.rotate_stays)
+        print("FP: " + str(fast_pulses))
+        self.motor_l.run_to_rel_pos(position_sp=fast_pulses, speed_sp=speed)
+        self.motor_r.run_to_rel_pos(position_sp=-fast_pulses, speed_sp=-speed)
+        self.motor_l.wait_until_not_moving()
+        self.motor_r.wait_until_not_moving()
+
+        col_counter = ConsecutiveCounter(4)
+        self.rotate_right(speed / 2)
+        target_dir = self.dir.apply_relative(RelativeDirection.Right)
+        target_color = DirectionColorMap[target_dir][0]
+        while not col_counter.triggered_by(target_color):
+            col_counter(self.read_color())
+        self.stop()
+        self.dir = target_dir
+        self.last_rotation_reldir = RelativeDirection.Right
+        self.rotate_stays += 1
 
     def stop(self):
         self.motor_l.stop()
@@ -229,7 +260,8 @@ def get_robot_calibration(color: RobotColor) -> BotCalibration:
                 ((70, 90), BoardColor.Red),
                 ((92, 100), BoardColor.White)
             ],
-            pulses_per_cm=35.2
+            pulses_per_cm=35.2,
+            pulses_per_90_degrees=490
         )
     if color == RobotColor.Green:
         return BotCalibration(
@@ -239,7 +271,8 @@ def get_robot_calibration(color: RobotColor) -> BotCalibration:
                 ((58, 75), BoardColor.Red),
                 ((80, 100), BoardColor.White)
             ],
-            pulses_per_cm=35.2
+            pulses_per_cm=35.2,
+            pulses_per_90_degrees=490
         )
     if color == RobotColor.Blue:
         return BotCalibration(
@@ -249,7 +282,8 @@ def get_robot_calibration(color: RobotColor) -> BotCalibration:
                 ((70, 85), BoardColor.Red),
                 ((90, 100), BoardColor.White)
             ],
-            pulses_per_cm=35.2
+            pulses_per_cm=35.2,
+            pulses_per_90_degrees=490
         )
     raise ValueError
 
@@ -271,11 +305,6 @@ if __name__ == '__main__':
     bot = EV3Bot(calib, board=b)
 
     try:
-        bot.turn_left()
-        while True:
-            time.sleep(1)
-        print("done")
-        sys.exit(0)
         bot.find_direction()
         print('Found dir', bot.dir)
         print('Motor L', bot.motor_l.position, 'Motor R', bot.motor_r.position)
