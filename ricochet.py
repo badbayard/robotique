@@ -10,7 +10,7 @@ WEST = 0x08
 ROBOT = 0X10
 
 REVERSE = [0 , SOUTH, WEST,0,NORTH,0,0,0,EAST]
-OFFSET = []
+OFFSET = [0,-1,-5,0,1,0,0,0,5]
 
 #Game = (grid[256],moves[256],robots[1],token,last)
 # Entry = (key,depth)
