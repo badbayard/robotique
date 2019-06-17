@@ -233,6 +233,7 @@ def search(game: Game, path: chr, callback: Callable[[int, int, int, int], None]
     if game_over(game):
         return 0
     result = 0
+    printf("Start Search")
     precompute_minimum_moves(game)
     for max_depth in range(1, MAX_DEPTH):
         global _nodes
@@ -241,7 +242,9 @@ def search(game: Game, path: chr, callback: Callable[[int, int, int, int], None]
         _nodes = 0
         _hits = 0
         _inner = 0
+        printf("Start step")
         result = _search(game, 0, max_depth, path)
+        printf("End Step")
         if callback:
             callback(max_depth, _nodes, _inner, _hits)
         if result:
