@@ -208,9 +208,12 @@ def _search(game: Game, depth: int, max_depth: int, path: chr):
     for robot in range(4):
         if robot and game.moves[game.robots[0]] == height:
             continue
-
-        for direction in range(1, 8):
+        
+        int direction =1
+        
+        for i in range(1, 4):
             if not can_move(game, robot, direction):
+                direction*=2
                 continue
 
             undo = do_move(game, robot, direction)
@@ -221,6 +224,7 @@ def _search(game: Game, depth: int, max_depth: int, path: chr):
             if result:
                 path[depth] = PACK_MOVE(robot, direction)
                 return result
+            direction*=2
     return 0
 
 
