@@ -209,7 +209,7 @@ def _search(game: Game, depth: int, max_depth: int, path: chr):
         if robot and game.moves[game.robots[0]] == height:
             continue
         
-        int direction =1
+        direction =1
         
         for i in range(1, 4):
             if not can_move(game, robot, direction):
