@@ -1,8 +1,5 @@
 import enum
-try:
-    from typing import Union, Optional, List
-except ImportError:
-    pass
+from typing import Union, Optional, List, Tuple
 
 
 class Position:
@@ -208,6 +205,9 @@ class Board:
                self.min_y <= pos.y <= self.max_y
 
 
+BoardColorCalibration = List[Tuple[Tuple[int, int], 'BoardColor']]
+
+
 @enum.unique
 class BoardColor(enum.Enum):
     Unknown = '?'
@@ -217,15 +217,11 @@ class BoardColor(enum.Enum):
     White = 'White'
 
     @classmethod
-    def from_itensity(cls, inten: int) -> 'BoardColor':
-        if inten <= 20:
-            return cls.Black
-        elif 50 <= inten <= 65:
-            return cls.Wood
-        elif 70 <= inten <= 85:
-            return cls.Red
-        elif inten >= 90:
-            return cls.White
+    def from_itensity(cls, inten: int, cal: BoardColorCalibration) \
+            -> 'BoardColor':
+        for centry in cal:
+            if centry[0][0] <= inten <= centry[0][1]:
+                return centry[1]
         return cls.Unknown
 
 
@@ -234,6 +230,14 @@ DirectionColorMap = {
     Direction.East: (BoardColor.Black, BoardColor.White),
     Direction.South: (BoardColor.Black, BoardColor.Red),
     Direction.West: (BoardColor.White, BoardColor.Black)
+}
+
+
+ColorDirectionMap = {
+    (BoardColor.Red, BoardColor.Black): Direction.North,
+    (BoardColor.Black, BoardColor.White): Direction.East,
+    (BoardColor.Black, BoardColor.Red): Direction.South,
+    (BoardColor.White, BoardColor.Black): Direction.West
 }
 
 
