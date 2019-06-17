@@ -255,6 +255,7 @@ def _callback(depth, nodes, inner,  hits):
 
 if __name__ == "__main__":
     game = Game()
+    game.grid = [13,8,8,8,9,5,4,0,0,1,4,0,1,0,1,4,0,0,0,1,6,2,2,2,3]
     game.robots = [196, 197, 135]
     game.token = 54
     path = [] * 32
