@@ -1,5 +1,6 @@
 import enum
-from typing import Union, Optional, List, Tuple
+from abc import ABC, abstractmethod
+from typing import Union, Optional, List, Tuple, Dict, Any
 
 
 class Position:
@@ -116,6 +117,20 @@ class Board:
         def explored(self, e: bool):
             self.board._explored[self.board._cell_index(self.pos)] = e
 
+        @property
+        def explored_by(self) -> Optional['Bot']:
+            return self.board._data[self.board._cell_index(self.pos)].get(
+                'explored_by', None)
+
+        @explored_by.setter
+        def explored_by(self, b):
+            self.board._data[self.board._cell_index(self.pos)]['explored_by'] \
+                = b
+
+        @property
+        def data(self) -> Dict[str, Any]:
+            return self.board._data[self.board._cell_index(self.pos)]
+
         def wall(self, dir: Direction) -> Wall:
             return self.board._walls[self.board._wall_index(self.pos, dir)]
 
@@ -169,7 +184,9 @@ class Board:
         self.max_y = max_height - 1
         self.max_pos = Position(self.max_x, self.max_y)
 
-        self._explored = [False] * (self.reserved_height * self.reserved_width)
+        cellcount = self.reserved_height * self.reserved_width
+        self._explored = [False] * cellcount
+        self._data = [{}] * cellcount
         self._walls = [Wall.Unknown] * (
                 (self.reserved_width + 1) * self.reserved_height +
                 (self.reserved_height + 1) * self.reserved_width
@@ -241,20 +258,72 @@ ColorDirectionMap = {
 }
 
 
-class Bot:
-    def __init__(self, board: Board):
-        self.board = board
+class Bot(ABC):
+    def __init__(self, name: str = "red", color: Optional[List[int]] = None):
         self.pos = Position(0, 0)
         self.dir = Direction.Unknown
+        self.color = color or [255, 0, 0]
+        self.name = name
 
-    def wall(self, dir):
-        # type: (Union[Direction, RelativeDirection]) -> Wall
+    @property
+    def dir_front(self):
+        return self.dir
+
+    @property
+    def dir_back(self):
+        return self.dir.apply_relative(RelativeDirection.Back)
+
+    @property
+    def dir_left(self):
+        return self.dir.apply_relative(RelativeDirection.Left)
+
+    @property
+    def dir_right(self):
+        return self.dir.apply_relative(RelativeDirection.Right)
+
+    @abstractmethod
+    def wall(self, dir: Union[Direction, RelativeDirection]) -> Wall:
+        ...
+
+    @abstractmethod
+    def forward(self, count: int = 1, *args, **kwargs) -> None:
+        ...
+
+    @abstractmethod
+    def backward(self, count: int = 1, *args, **kwargs) -> None:
+        ...
+
+    @abstractmethod
+    def turn_left(self, *args, **kwargs):
+        ...
+
+    @abstractmethod
+    def turn_right(self, *args, **kwargs):
+        ...
+
+    @abstractmethod
+    def write_info(self, board: Board, *args, **kwargs):
+        ...
+
+
+class RealWorldError(RuntimeError):
+    pass
+
+
+class FakeBot(Bot):
+    def __init__(self, board: Board):
+        super().__init__()
+        self.board = board
+
+    def wall(self, dir: Union[Direction, RelativeDirection]) -> Wall:
         if isinstance(dir, RelativeDirection):
             dir = self.dir.apply_relative(dir)
         return self.board[self.pos].wall(dir)
 
     def forward(self, count: int = 1, *args, **kwargs) -> None:
         for _ in range(count):
+            if self.board[self.pos].wall(self.dir) != Wall.No:
+                raise RealWorldError("Ran into a wall")
             nextpos = self.pos.move(self.dir)
             if nextpos not in self.board:
                 raise ValueError("Moved too far")
@@ -263,6 +332,8 @@ class Bot:
     def backward(self, count: int = 1, *args, **kwargs) -> None:
         dir = self.dir.apply_relative(RelativeDirection.Back)
         for _ in range(count):
+            if self.board[self.pos].wall(dir) != Wall.No:
+                raise RealWorldError("Ran into a wall")
             nextpos = self.pos.move(dir)
             if nextpos not in self.board:
                 raise ValueError("Moved too far")
@@ -274,88 +345,11 @@ class Bot:
     def turn_right(self, *args, **kwargs):
         self.dir = self.dir.apply_relative(RelativeDirection.Right)
 
-
-class TerminalView:
-    HorizontalWalls = {
-        Wall.Unknown: '\x1B[2m─?─\x1B[22m',
-        Wall.Yes: '━━━',
-        Wall.No: '   '
-    }
-    VerticalWalls = {
-        Wall.Unknown: '\x1B[2m?\x1B[22m',
-        Wall.Yes: '┃',
-        Wall.No: ' '
-    }
-
-    def __init__(self, board: Board, bot: Bot):
-        # self.clear()
-        self.board = board
-        self.bot = bot
-
-    def display(self):
-        board = self.board
-        bot = self.bot
-        for y in range(board.min_y, board.max_y + 1):
-            if y == board.min_y:
-                print('┌' + self.HorizontalWalls[board[
-                    Position(board.min_x, y)].wall(Direction.North)], end='')
-                for x in range(board.min_x + 1, board.max_x + 1):
-                    print('┬' + self.HorizontalWalls[board[
-                        Position(x, y)].wall(Direction.North)], end='')
-                print('┐', end='')
-            else:
-                print('├' + self.HorizontalWalls[board[
-                    Position(board.min_x, y)].wall(Direction.North)], end='')
-                for x in range(board.min_x + 1, board.max_x + 1):
-                    print('┼' + self.HorizontalWalls[board[
-                        Position(x, y)].wall(Direction.North)], end='')
-                print('┤', end='')
-            print('')
-            for x in range(board.min_x, board.max_x + 1):
-                char = '   '
-                if x == bot.pos.x and y == bot.pos.y:
-                    char = {
-                        Direction.North: ' ↑ ',
-                        Direction.East: ' → ',
-                        Direction.South: ' ↓ ',
-                        Direction.West: ' ← ',
-                        Direction.Unknown: ' ? '
-                    }[bot.dir]
-                cell = board[Position(x, y)]
-                color = ''  # if cell.explored else '\x1B[100m'
-                if not cell.explored:
-                    char = '\x1B[2m - '
-                print(self.VerticalWalls[cell.wall(Direction.West)] + '{}{}\x1B[49m\x1B[22m'.format(color, char), end='')
-            print(self.VerticalWalls[board[
-                Position(board.max_x, y)].wall(Direction.East)])
-        print('└' + self.HorizontalWalls[board[
-            Position(board.min_x, board.max_y)].wall(Direction.South)], end='')
-        for x in range(board.min_x + 1, board.max_x + 1):
-            print('┴' + self.HorizontalWalls[board[
-                Position(x, board.max_y)].wall(Direction.South)], end='')
-        print('┘')
-
-    @staticmethod
-    def clear():
-        print('\x1Bc', end='', flush=True)
-
-
-if __name__ == '__main__':
-    import time, sys
-
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
-    except AttributeError:
-        import codecs
-        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
-
-    b = Board(3, 3)
-    bot = Bot(b)
-    tv = TerminalView(b, bot)
-    b[Position(0, 0)].explored = True
-    for x in range(len(b._walls)):
-        b._walls[x] = Wall.Yes
-        tv.display()
-        time.sleep(0.3)
+    def write_info(self, board: Board, *args, **kwargs):
+        cell = board[self.pos]
+        ocell = self.board[self.pos]
+        cell.set_wall(self.dir_left, ocell.wall(self.dir_left))
+        cell.set_wall(self.dir, ocell.wall(self.dir))
+        cell.set_wall(self.dir_right, ocell.wall(self.dir_right))
+        cell.explored = True
+        cell.explored_by = self

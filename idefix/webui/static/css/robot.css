@@ -1,0 +1,47 @@
+html, body, .main, #boardcontainer, #rightpanel { height: 100vh; }
+
+.robotgrid {
+  font-size: 150%;
+  border-collapse: collapse;
+  border: 0.1em solid black;
+  display: inline-table;
+  vertical-align: top;
+}
+
+.robotgrid td {
+  width: 1.5em;
+  height: 1.5em;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.robotgrid .wt-u { border-top: 0.1em solid gray; }
+.robotgrid .wt-y { border-top: 0.1em solid black; }
+.robotgrid .wt-n { border-top: none; }
+.robotgrid .wl-u { border-left: 0.1em solid gray; }
+.robotgrid .wl-y { border-left: 0.1em solid black; }
+.robotgrid .wl-n { border-left: none; }
+.robotgrid .c-unexp { background-color: #DDD; color: #AAA; }
+
+#rightpanel {
+  display: inline-flex;
+  flex-direction: column;
+  flex: 1 1 0;
+}
+#rightpanel > * { flex: 1; overflow: auto; }
+
+#commandlog {
+  background: #111;
+  color: #EEE;
+  font-family: sans-serif;
+}
+#commandlog .line:before {
+  display: inline;
+  padding: 0 .2em;
+  margin-right: .2em;
+  height: 1em;
+  content: '>';
+  color: black;
+}
+
+#commandlog .line.b-red:before { background: red; }

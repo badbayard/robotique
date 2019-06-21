@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block body %}
+<div class="pure-u-3-4" id="boardcontainer">{{ board1 }}</div>
+<div class="pure-u-1-4" id="rightpanel">
+  <div>
+    <button class="pure-button" id="btn-step">Step</button>
+    <button class="pure-button" id="btn-reset">Reset</button>
+  </div>
+  <div id="commandlog"></div>
+</div>
+<script>
+function $(x) { return document.getElementById(x); }
+
+function parseBoardResponse(text) {
+    const json = JSON.parse(text);
+    $('boardcontainer').innerHTML = json['board'];
+    const log = $('commandlog');
+    for (const cmdline of json['commands']){
+        const line = document.createElement('div');
+        line.classList.add('line');
+        line.classList.add('b-' + cmdline.bot);
+        line.innerText = cmdline.cmd;
+        log.appendChild(line);
+    }
+}
+
+$('btn-step').addEventListener('click', (event) => {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState !== XMLHttpRequest.DONE) {
+            return;
+        }
+        if (xhr.status === 200) {
+            parseBoardResponse(xhr.responseText);
+        } else {
+            alert('There was a problem with the request.');
+        }
+    };
+    xhr.open('GET', '/step', true);
+    xhr.send();
+}, false);
+$('btn-reset').addEventListener('click', (event) => {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState !== XMLHttpRequest.DONE) {
+            return;
+        }
+        if (xhr.status === 200) {
+            parseBoardResponse(xhr.responseText);
+        } else {
+            alert('There was a problem with the request.');
+        }
+    };
+    xhr.open('GET', '/reset', true);
+    xhr.send();
+}, false);
+</script>
+{% endblock %}

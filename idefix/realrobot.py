@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-from classes import *
+from idefix import *
 from ev3dev.ev3 import *
-from time import sleep
-try:
-    from typing import Union, Optional, List
-except ImportError:
-    pass
+import pkgutil
+import json
 
 
 class ConsecutiveCounter:
@@ -70,9 +67,9 @@ class RealBot(Bot):
     def move_cm(self, cm: float, speed: float = DEFAULT_SPEED):
         self.rotate_stays = 0
         end = self.motor_l.position + self.calibration.pulses_per_cm * cm
-        #correct_dir = None
-        #supercorrecting = False
-        #supercorrecting_start =  None
+        # correct_dir = None
+        # supercorrecting = False
+        # supercorrecting_start =  None
         if self.last_rotation_reldir in (RelativeDirection.Left, None):
             self.motor_l.run_forever(speed_sp=speed - self.CORRECT_SPEED)
             self.motor_r.run_forever(speed_sp=speed + self.CORRECT_SPEED)
@@ -82,19 +79,19 @@ class RealBot(Bot):
         while self.motor_l.position <= end:
             col = self.read_color()
             if col == DirectionColorMap[self.dir][1]:  # Correct left
-                #if supercorrecting:
+                # if supercorrecting:
                 #    supercorrecting = False
                 #   end += self.motor_l.position - supercorrecting_start
                 self.motor_l.run_forever(speed_sp=speed - self.CORRECT_SPEED)
                 self.motor_r.run_forever(speed_sp=speed + self.CORRECT_SPEED)
                 #correct_dir = RelativeDirection.Left
-            elif col == DirectionColorMap[self.dir][0]:  # Correcy right
-                #if supercorrecting:
+            elif  col == DirectionColorMap[self.dir][0]:  # Correcy right
+                # if supercorrecting:
                 #    supercorrecting = False
                 #    end += self.motor_l.position - supercorrecting_start
                 self.motor_l.run_forever(speed_sp=speed + self.CORRECT_SPEED)
                 self.motor_r.run_forever(speed_sp=speed - self.CORRECT_SPEED)
-                #correct_dir = RelativeDirection.Right
+                # correct_dir = RelativeDirection.Right
             '''else:
                 supercorrecting = True
                 supercorrecting_start = self.motor_l.position
@@ -232,60 +229,46 @@ class RealBot(Bot):
         print("Direction: " + str(direction))
 
 
+CALIBRATION_JSON_FILENAME = 'robots.json'
+CALIBRATION_JSON = json.loads(pkgutil.get_data(
+    __package__, CALIBRATION_JSON_FILENAME))
+
+
+def get_robot_calibration(hostname: str) -> BotCalibration:
+    for robot in CALIBRATION_JSON['robots']:
+        if robot['match_hostname'] == hostname:
+            cc = robot['sensor_colors']
+            return BotCalibration(
+                color=[
+                    ((cc['Black'][0], cc['Black'][1]), BoardColor.Black),
+                    ((cc['Wood'][0], cc['Wood'][1]), BoardColor.Wood),
+                    ((cc['Red'][0], cc['Red'][1]), BoardColor.Red),
+                    ((cc['White'][0], cc['White'][1]), BoardColor.White)
+                ],
+                pulses_per_cm=robot['pulses_per_cm'],
+                pulses_per_90_degrees=robot['pulses_per_90_degrees']
+            )
+    raise KeyError("No calibration for hostname '{}'".format(hostname))
+
+
 class EV3Bot(RealBot):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, hostname, *args, **kwargs):
         color_sensor = ColorSensor('in4')
         color_sensor.mode = 'COL-REFLECT'
         m_l = LargeMotor('outB')
         m_r = LargeMotor('outC')
+        name, color = None, None
+        for robot in CALIBRATION_JSON['robots']:
+            if robot['match_hostname'] == hostname:
+                name = robot['name']
+                color = robot['color']
         super(EV3Bot, self).__init__(
             m_l, m_r,
             color_sensor,
-            *args, **kwargs)
-
-
-@enum.unique
-class RobotColor(enum.Enum):
-    Red = 96
-    Green = 97
-    Blue = 135
-
-
-def get_robot_calibration(color: RobotColor) -> BotCalibration:
-    if color == RobotColor.Red:
-        return BotCalibration(
-            color=[
-                ((0, 22), BoardColor.Black),
-                ((50, 65), BoardColor.Wood),
-                ((70, 90), BoardColor.Red),
-                ((92, 100), BoardColor.White)
-            ],
-            pulses_per_cm=35.2,
-            pulses_per_90_degrees=490
-        )
-    if color == RobotColor.Green:
-        return BotCalibration(
-            color=[
-                ((0, 20), BoardColor.Black),
-                ((40, 55), BoardColor.Wood),
-                ((58, 75), BoardColor.Red),
-                ((80, 100), BoardColor.White)
-            ],
-            pulses_per_cm=35.2,
-            pulses_per_90_degrees=490
-        )
-    if color == RobotColor.Blue:
-        return BotCalibration(
-            color=[
-                ((0, 20), BoardColor.Black),
-                ((50, 65), BoardColor.Wood),
-                ((70, 85), BoardColor.Red),
-                ((90, 100), BoardColor.White)
-            ],
-            pulses_per_cm=35.2,
-            pulses_per_90_degrees=490
-        )
-    raise ValueError
+            *args,
+            name=name,
+            color=color,
+            **kwargs)
 
 
 if __name__ == '__main__':
@@ -300,7 +283,7 @@ if __name__ == '__main__':
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
         '''
 
-    calib = get_robot_calibration(RobotColor.Green)
+    calib = get_robot_calibration('green')
     b = Board(8, 8)
     bot = EV3Bot(calib, board=b)
 

@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pure-min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/robot.css') }}">
+  </head>
+  <body>
+    <div class="main pure-g">
+      {% block body %}{% endblock %}
+    </div>
+  </body>
+</html>
