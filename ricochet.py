@@ -10,7 +10,9 @@ WEST = 0x08
 ROBOT = 0X10
 
 REVERSE = [0 , SOUTH, WEST,0,NORTH,0,0,0,EAST]
-OFFSET = [0,-1,-5,0,1,0,0,0,5]
+OFFSET = []
+#A TESTER
+#OFFSET = [0,-1,-5,0,1,0,0,0,5]
 
 #Game = (grid[256],moves[256],robots[1],token,last)
 # Entry = (key,depth)
@@ -265,7 +267,7 @@ def _callback(depth, nodes, inner,  hits):
 if __name__ == "__main__":
     game = Game()
     game.grid = [13,8,8,8,9,5,4,0,0,1,4,0,1,0,1,4,0,0,0,1,6,2,2,2,3]
-    OFFSET = [0,-1,-5,0,1,0,0,0,5]
+    OFFSET = [0,1,5,0,-1,0,0,0,-5]
     game.robots = [4, 20, 24]
     game.token = 54
     path = [] * 32
