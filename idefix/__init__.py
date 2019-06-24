@@ -42,6 +42,21 @@ class Position:
     def __repr__(self):
         return 'Position({}, {})'.format(self._x, self._y)
 
+    def __lt__(self, other):
+        if isinstance(other, Position):
+            if self._x < other._x:
+                return True
+            return self._y < other._y
+        return False
+
+    def __eq__(self, other):
+        if isinstance(other, Position):
+            return self._x == other._x and self._y == other._y
+        return False
+
+    def __hash__(self):
+        return hash((self._x, self._y))
+
     def move(self, dir: 'Direction') -> 'Position':
         delta = {
             Direction.North: (0, -1),
@@ -50,6 +65,7 @@ class Position:
             Direction.West: (-1, 0)
         }.get(dir)
         return Position(self._x + delta[0], self._y + delta[1])
+
 
 @enum.unique
 class RelativeDirection(enum.Enum):
@@ -156,7 +172,7 @@ class Board:
             for dir in [Direction.North, Direction.East,
                         Direction.South, Direction.West]:
                 if self.wall(dir) in (
-                        [Wall.Yes] if strict else [Wall.Yes, Wall.Unknown]):
+                        [Wall.No] if strict else [Wall.No, Wall.Unknown]):
                     neigh = self.neighbour(dir)
                     if neigh is not None:
                         acc.append(neigh)
@@ -186,7 +202,9 @@ class Board:
 
         cellcount = self.reserved_height * self.reserved_width
         self._explored = [False] * cellcount
-        self._data = [{}] * cellcount
+        self._data = []
+        for _ in range(cellcount):
+            self._data.append({})
         self._walls = [Wall.Unknown] * (
                 (self.reserved_width + 1) * self.reserved_height +
                 (self.reserved_height + 1) * self.reserved_width
@@ -214,7 +232,7 @@ class Board:
     def __getitem__(self, key: Position):
         if not (self.min_x <= key.x <= self.max_x) or \
            not (self.min_y <= key.y <= self.max_y):
-            return IndexError
+            raise IndexError
         return self.Cell(self, key)
 
     def __contains__(self, pos: Position):
@@ -259,11 +277,13 @@ ColorDirectionMap = {
 
 
 class Bot(ABC):
-    def __init__(self, name: str = "red", color: Optional[List[int]] = None):
-        self.pos = Position(0, 0)
-        self.dir = Direction.Unknown
-        self.color = color or [255, 0, 0]
-        self.name = name
+    def __init__(self, name: str = "red", color: Optional[List[int]] = None,
+                 skip_init: bool = False):
+        if not skip_init:
+            self.pos = Position(0, 0)
+            self.dir = Direction.Unknown
+            self.color = color or [255, 0, 0]
+            self.name = name
 
     @property
     def dir_front(self):

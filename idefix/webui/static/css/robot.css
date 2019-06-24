@@ -33,7 +33,7 @@ html, body, .main, #boardcontainer, #rightpanel { height: 100vh; }
 #commandlog {
   background: #111;
   color: #EEE;
-  font-family: sans-serif;
+  font-family: monospace;
 }
 #commandlog .line:before {
   display: inline;

@@ -49,12 +49,20 @@ class RealBot(Bot):
     CM_PER_CELL = 30
 
     def __init__(self, motor_l: LargeMotor, motor_r: LargeMotor,
-                 color_sensor: ColorSensor,
+                 distance_l: Optional[UltrasonicSensor],
+                 distance_f: Optional[UltrasonicSensor],
+                 distance_r: Optional[UltrasonicSensor],
+                 color_sensor: Optional[ColorSensor],
+                 gyro: Optional[GyroSensor],
                  calibration: BotCalibration,
                  *args, **kwargs):
         super(RealBot, self).__init__(*args, **kwargs)
         self.motor_l, self.motor_r = motor_l, motor_r
+        self.distance_l = distance_l
+        self.distance_f = distance_f
+        self.distance_r = distance_r
         self.color_sensor = color_sensor
+        self.gyro = gyro
         self.calibration = calibration
         self.rotate_stays = 0
         self.last_rotation_reldir = None
@@ -65,6 +73,12 @@ class RealBot(Bot):
             self.calibration.color)
 
     def move_cm(self, cm: float, speed: float = DEFAULT_SPEED):
+        if self.gyro is None:
+            self.move_cm_color(cm, speed)
+        else:
+            self.move_cm_gyro(cm, speed)
+
+    def move_cm_color(self, cm: float, speed: float):
         self.rotate_stays = 0
         end = self.motor_l.position + self.calibration.pulses_per_cm * cm
         # correct_dir = None
@@ -107,6 +121,9 @@ class RealBot(Bot):
         self.motor_l.stop()
         self.motor_r.stop()
 
+    def move_cm_gyro(self, cm: float, speed: float):
+        raise NotImplementedError
+
     def wait_movement(self):
         self.motor_l.wait_while('running')
         self.motor_r.wait_while('running')
@@ -126,6 +143,12 @@ class RealBot(Bot):
         self.backward_cm(count * self.CM_PER_CELL, speed)
 
     def turn_left(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
+        if self.gyro is None:
+            self.turn_left_color(speed, *args, **kwargs)
+        else:
+            pass  # TODO
+
+    def turn_left_color(self, speed: float, *args, **kwargs):
         pulses = kwargs.get("pulses", self.calibration.pulses_per_90_degrees)
         fast_pulses = pulses - min(
             pulses,
@@ -148,7 +171,13 @@ class RealBot(Bot):
         self.last_rotation_reldir = RelativeDirection.Left
         self.rotate_stays += 1
 
-    def turn_right(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
+    def turn_right(self, speed: float, *args, **kwargs):
+        if self.gyro is None:
+            self.turn_right_color(speed, *args, **kwargs)
+        else:
+            pass  # TODO
+
+    def turn_right_color(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
         pulses = kwargs.get("pulses", self.calibration.pulses_per_90_degrees)
         fast_pulses = pulses - min(
             pulses,
@@ -231,7 +260,7 @@ class RealBot(Bot):
 
 CALIBRATION_JSON_FILENAME = 'robots.json'
 CALIBRATION_JSON = json.loads(pkgutil.get_data(
-    __package__, CALIBRATION_JSON_FILENAME))
+    __package__, CALIBRATION_JSON_FILENAME).decode('utf-8'))
 
 
 def get_robot_calibration(hostname: str) -> BotCalibration:
@@ -253,18 +282,41 @@ def get_robot_calibration(hostname: str) -> BotCalibration:
 
 class EV3Bot(RealBot):
     def __init__(self, hostname, *args, **kwargs):
-        color_sensor = ColorSensor('in4')
-        color_sensor.mode = 'COL-REFLECT'
-        m_l = LargeMotor('outB')
-        m_r = LargeMotor('outC')
-        name, color = None, None
-        for robot in CALIBRATION_JSON['robots']:
-            if robot['match_hostname'] == hostname:
-                name = robot['name']
-                color = robot['color']
+        robot = None
+        for entry in CALIBRATION_JSON['robots']:
+            if entry['match_hostname'] == hostname:
+                robot = entry
+        if robot is None:
+            raise KeyError("No robot '{}'".format(hostname))
+        name = robot['name']
+        color = robot['color']
+
+        per = robot['peripherals']
+        try:
+            distance_l = UltrasonicSensor(per['distance_l'])
+        except KeyError:
+            distance_l = None
+        distance_f = UltrasonicSensor(per['distance_f'])
+        try:
+            distance_r = UltrasonicSensor(per['distance_r'])
+        except KeyError:
+            distance_r = None
+        try:
+            color_sensor = ColorSensor(per['color_sensor'])
+            color_sensor.mode = 'COL-REFLECT'
+        except KeyError:
+            color_sensor = None
+        try:
+            gyro = GyroSensor(per['gyro'])
+            gyro.mode = 'GYR-TILT'
+        except KeyError:
+            gyro = None
+        motor_l = LargeMotor(per['motor_l'])
+        motor_r = LargeMotor(per['motor_r'])
         super(EV3Bot, self).__init__(
-            m_l, m_r,
-            color_sensor,
+            motor_l, motor_r,
+            distance_l, distance_f, distance_r,
+            color_sensor, gyro,
             *args,
             name=name,
             color=color,

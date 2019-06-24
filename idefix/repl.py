@@ -2,10 +2,11 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List
 import traceback
+import platform
 import readline  # Historique sur le input()
 
 from idefix import Board, Direction
-from idefix.realrobot import RealBot, EV3Bot, get_robot_calibration, RobotColor
+from idefix.realrobot import RealBot, EV3Bot, get_robot_calibration
 
 
 class REPLContext:
@@ -157,7 +158,6 @@ def repl_cmd(ctx: REPLContext, cmd: str, args: Optional[List] = None):
 
 
 def repl(ctx: REPLContext):
-    import platform
     hostname = platform.node()
     prompt = "R!" + hostname + "> "
     del hostname
@@ -179,7 +179,7 @@ def repl(ctx: REPLContext):
 
 
 if __name__ == '__main__':
-    calib = get_robot_calibration(RobotColor.Green)
+    calib = get_robot_calibration(platform.node())
     b = Board(8, 8)
     bot = EV3Bot(calib, board=b)
 

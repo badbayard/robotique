@@ -1,9 +1,11 @@
 from io import StringIO
-from typing import List
+from typing import List, Iterator
 
 from flask import render_template, Markup, jsonify
 
-from idefix import Board, FakeBot, Bot, Wall, Direction, Position, boardgen
+from idefix import Board, FakeBot, Bot, Wall, Direction, Position, boardgen, \
+    astar
+from idefix.proxy import ProxyBot
 from idefix.webui import app
 
 
@@ -47,6 +49,10 @@ class HTMLTableBoardView:
                 else:
                     classes.append('c-unexp')
                     content = '?'
+                if 'bgcolor' in cell.data:
+                    bgcolor = cell.data['bgcolor']  # type: List[int]
+                    if len(bgcolor) == 3:
+                        bgcolor.append(1)
                 for bot in self.bots:
                     if x == bot.pos.x and y == bot.pos.y:
                         content = {
@@ -79,55 +85,79 @@ class HTMLTableBoardView:
 # TODO: virer tout ça
 board = None  # type: Board
 discoveryboard = None  # type: Board
-bot = None  # type: Bot
-def mkboard():
-    global board, discoveryboard, bot
-    board = boardgen.generate_board(5, 5)
-    discoveryboard = Board(5, 5)
-    bot = FakeBot(board)
-    bot.dir = Direction.East
+bot = None  # type: ProxyBot
+discovery = None  # type: Iterator
+
+def run_discovery():
+    # On tourne pour savoir l'état des 4 murs autour du robot
+    commands = []
     bot.write_info(discoveryboard)
-mkboard()
-
-
-def run_discovery(commands: List):
-    cell = discoveryboard[bot.pos]
-    try:
-        fwdcell = discoveryboard[bot.pos.move(bot.dir)]
-    except IndexError:
-        fwdcell = None
-    if cell.wall(bot.dir) == Wall.Yes:
-        lwall = cell.wall(bot.dir_left) == Wall.Yes
-        rwall = cell.wall(bot.dir_right) == Wall.Yes
-        if lwall:
-            bot.turn_right()
-            commands.append({'bot': bot.name, 'cmd': 'r'})
-        elif rwall:
-            bot.turn_left()
-            commands.append({'bot': bot.name, 'cmd': 'l'})
-        elif lwall and rwall:
-            bot.turn_left()
-            bot.turn_left()
-            commands.append({'bot': bot.name, 'cmd': 'seq ll'})
-        else:
-            bot.turn_left()
-            commands.append({'bot': bot.name, 'cmd': 'l'})
-    else:
-        if fwdcell is not None and fwdcell.explored:
+    bot.turn_left()
+    bot.write_info(discoveryboard)
+    yield bot.command_list
+    bot.clear_command_list()
+    to_discover = discoveryboard[bot.pos].accessible_neighbours  # type: List[Board.Cell]
+    while len(to_discover) != 0:
+        '''least_shitty = None
+least_shitty_score = float('-inf')
+for d in to_discover:
+    path = astar.path(discoveryboard, bot.pos, d.pos)
+    if path is not None:
+        for step in path:
+            board[step].data['bgcolor'] = [255, 255, 192]
+    least'''
+        try:
+            fwdcell = discoveryboard[bot.pos.move(bot.dir)]
+        except IndexError:
+            fwdcell = None
+        cell = discoveryboard[bot.pos]
+        if cell.wall(bot.dir) == Wall.Yes:
             lwall = cell.wall(bot.dir_left) == Wall.Yes
             rwall = cell.wall(bot.dir_right) == Wall.Yes
-            if not lwall:
-                bot.turn_left()
-                commands.append({'bot': bot.name, 'cmd': 'l'})
-            elif not rwall:
+            if lwall:
                 bot.turn_right()
-                commands.append({'bot': bot.name, 'cmd': 'r'})
+            elif rwall:
+                bot.turn_left()
+            elif lwall and rwall:
+                bot.turn_left()
+                bot.turn_left()
             else:
-                pass
+                bot.turn_left()
         else:
-            bot.forward()
-            commands.append({'bot': bot.name, 'cmd': 'f'})
-    bot.write_info(discoveryboard)
+            if fwdcell is not None and fwdcell.explored:
+                lwall = cell.wall(bot.dir_left) == Wall.Yes
+                rwall = cell.wall(bot.dir_right) == Wall.Yes
+                if not lwall:
+                    bot.turn_left()
+                elif not rwall:
+                    bot.turn_right()
+                else:
+                    pass
+            else:
+                bot.forward()
+        bot.write_info(discoveryboard)
+        yield bot.command_list
+        bot.clear_command_list()
+
+
+def mkboard():
+    global board, discoveryboard, bot, discovery
+    board = boardgen.generate_board(5, 5)
+    discoveryboard = Board(5, 5)
+    fakebot = FakeBot(board)
+    fakebot.dir = Direction.East
+    fakebot.write_info(discoveryboard)
+    bot = ProxyBot(fakebot)
+    discovery = run_discovery()
+    from idefix import astar
+    #print(astar.search(board, Position(0, 0), Position(4, 4)))
+    try:
+        path = astar.reconstruct_path(astar.search(board, Position(0, 0), Position(4, 4))[0], Position(0, 0), Position(4, 4))
+        for step in path:
+            board[step].data['bgcolor'] = [255, 255, 192]
+    except KeyError:
+        pass
+mkboard()
 
 
 @app.route('/')
@@ -139,8 +169,7 @@ def index():
 
 @app.route('/step')
 def step():
-    commands = []
-    run_discovery(commands)
+    commands = next(discovery)
     view = HTMLTableBoardView(discoveryboard, [bot])
     viewreal = HTMLTableBoardView(board, [bot])
     return jsonify({

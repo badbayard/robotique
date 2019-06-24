@@ -5,6 +5,14 @@
       "match_hostname": "red",
       "color": [255, 0, 0],
       "ip": "192.168.1.96",
+      "peripherals": {
+        "distance_f": "in1",
+        "distance_l": "in2",
+        "distance_r": "in3",
+        "gyro": "in4",
+        "motor_l": "outB",
+        "morot_r": "outC"
+      },
       "sensor_colors": {
         "Black": [0, 22],
         "Wood": [50, 65],
