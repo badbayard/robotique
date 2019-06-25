@@ -113,9 +113,10 @@ class DirectionCommand(REPLCommand):
         try:
             namemap = {
                 'n': Direction.North,
-                'r': Direction.East,
+                'e': Direction.East,
                 's': Direction.South,
-                'w': Direction.West
+                'w': Direction.West,
+                'o': Direction.West
             }
             olddir = ctx.bot.dir
             ctx.bot.dir = namemap[args[0]]
