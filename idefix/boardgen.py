@@ -4,7 +4,7 @@ from idefix import Board, Wall, Direction, Position
 
 
 def randwall(wall_chance: float):
-    return random.choices([Wall.Yes, Wall.No], [wall_chance, 1-wall_chance])[0]
+    return Wall.Yes if random.random() < wall_chance else Wall.No
 
 
 def generate_board(max_width: int, max_height: int, wall_chance: float = 0.2) \
