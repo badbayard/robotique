@@ -111,6 +111,33 @@ class Direction(enum.Enum):
             }
         }.get(self, {}).get(rel, Direction.Unknown)
 
+    def get_relative(self, dir: 'Direction') -> RelativeDirection:
+        return {
+            Direction.North: {
+                Direction.North: RelativeDirection.Front,
+                Direction.East: RelativeDirection.Right,
+                Direction.South: RelativeDirection.Back,
+                Direction.West: RelativeDirection.Left
+            },
+            Direction.East: {
+                Direction.North: RelativeDirection.Left,
+                Direction.East: RelativeDirection.Front,
+                Direction.South: RelativeDirection.Right,
+                Direction.West: RelativeDirection.Back
+            },
+            Direction.South: {
+                Direction.North: RelativeDirection.Back,
+                Direction.East: RelativeDirection.Left,
+                Direction.South: RelativeDirection.Front,
+                Direction.West: RelativeDirection.Right
+            },
+            Direction.West: {
+                Direction.North: RelativeDirection.Right,
+                Direction.East: RelativeDirection.Back,
+                Direction.South: RelativeDirection.Left,
+                Direction.West: RelativeDirection.Front
+            }
+        }.get(self, {}).get(dir, None)
 
 @enum.unique
 class Wall(enum.Enum):

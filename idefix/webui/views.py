@@ -4,7 +4,7 @@ from typing import List, Iterator
 from flask import render_template, Markup, jsonify
 
 from idefix import Board, FakeBot, Bot, Wall, Direction, Position, boardgen, \
-    astar
+    astar, RelativeDirection
 from idefix.proxy import ProxyBot
 from idefix.webui import app
 
@@ -45,7 +45,7 @@ class HTMLTableBoardView:
                         self.VerticalWalls[cell.wall(Direction.West)])
                 if cell.explored:
                     if cell.explored_by is not None:
-                        bgcolor = [*cell.explored_by.color, 0.5]
+                        bgcolor = [*cell.explored_by.color, 0.2]
                 else:
                     classes.append('c-unexp')
                     content = '?'
@@ -77,10 +77,6 @@ class HTMLTableBoardView:
         out.write('</table>')
         return out.getvalue()
 
-    @staticmethod
-    def clear():
-        print('\x1Bc', end='', flush=True)
-
 
 # TODO: virer tout ça
 board = None  # type: Board
@@ -88,54 +84,67 @@ discoveryboard = None  # type: Board
 bot = None  # type: ProxyBot
 discovery = None  # type: Iterator
 
+
 def run_discovery():
     # On tourne pour savoir l'état des 4 murs autour du robot
-    commands = []
+    def mark_candidates(candidates):
+        for cell in candidates:
+            if Wall.No in (
+                    cell.wall(Direction.North), cell.wall(Direction.East),
+                    cell.wall(Direction.South), cell.wall(Direction.West)):
+                cell.data['bgcolor'] = [255, 255, 128]
+
+    def get_candidates() -> List[Board.Cell]:
+        ret = []
+        for y in range(discoveryboard.min_y, discoveryboard.max_y + 1):
+            for x in range(discoveryboard.min_x, discoveryboard.max_x + 1):
+                cell = discoveryboard[Position(x, y)]
+                if cell.explored:
+                    continue
+                if Wall.No in (
+                        cell.wall(Direction.North), cell.wall(Direction.East),
+                        cell.wall(Direction.South), cell.wall(Direction.West)):
+                    ret.append(cell)
+        return ret
     bot.write_info(discoveryboard)
+    mark_candidates(get_candidates())
+    yield []
     bot.turn_left()
     bot.write_info(discoveryboard)
+    mark_candidates(get_candidates())
     yield bot.command_list
     bot.clear_command_list()
-    to_discover = discoveryboard[bot.pos].accessible_neighbours  # type: List[Board.Cell]
-    while len(to_discover) != 0:
-        '''least_shitty = None
-least_shitty_score = float('-inf')
-for d in to_discover:
-    path = astar.path(discoveryboard, bot.pos, d.pos)
-    if path is not None:
-        for step in path:
-            board[step].data['bgcolor'] = [255, 255, 192]
-    least'''
-        try:
-            fwdcell = discoveryboard[bot.pos.move(bot.dir)]
-        except IndexError:
-            fwdcell = None
-        cell = discoveryboard[bot.pos]
-        if cell.wall(bot.dir) == Wall.Yes:
-            lwall = cell.wall(bot.dir_left) == Wall.Yes
-            rwall = cell.wall(bot.dir_right) == Wall.Yes
-            if lwall:
-                bot.turn_right()
-            elif rwall:
-                bot.turn_left()
-            elif lwall and rwall:
-                bot.turn_left()
-                bot.turn_left()
-            else:
-                bot.turn_left()
-        else:
-            if fwdcell is not None and fwdcell.explored:
-                lwall = cell.wall(bot.dir_left) == Wall.Yes
-                rwall = cell.wall(bot.dir_right) == Wall.Yes
-                if not lwall:
-                    bot.turn_left()
-                elif not rwall:
-                    bot.turn_right()
-                else:
-                    pass
-            else:
-                bot.forward()
+    while True:
+        candidates = get_candidates()
+        if len(candidates) == 0:
+            break
+        candidates_paths = [*map(
+            lambda d: astar.path(discoveryboard, bot.pos, d.pos), candidates)]
+        shortest_idx = min(enumerate(candidates_paths),
+                           key=lambda x: len(x[1]))[0]
+
+        path = candidates_paths[shortest_idx]
+        nextpos = path[1]  # type: Position
+        nextdir = None
+        for d in (Direction.North, Direction.East,
+                  Direction.South, Direction.West):
+            if nextpos == bot.pos.move(d):
+                nextdir = d
+        reldir = bot.dir.get_relative(nextdir)
+        if reldir == RelativeDirection.Front:
+            bot.forward()
+        elif reldir == RelativeDirection.Right:
+            bot.turn_right()
+        elif reldir == RelativeDirection.Back:
+            bot.turn_right()
+            bot.turn_right()
+        elif reldir == RelativeDirection.Left:
+            bot.turn_left()
+        mark_candidates(candidates)
+        candidates[shortest_idx].data['bgcolor'] = [255, 255, 0]
         bot.write_info(discoveryboard)
+        discoveryboard[bot.pos].data.pop('bgcolor', None)
+
         yield bot.command_list
         bot.clear_command_list()
 
@@ -149,14 +158,6 @@ def mkboard():
     fakebot.write_info(discoveryboard)
     bot = ProxyBot(fakebot)
     discovery = run_discovery()
-    from idefix import astar
-    #print(astar.search(board, Position(0, 0), Position(4, 4)))
-    try:
-        path = astar.reconstruct_path(astar.search(board, Position(0, 0), Position(4, 4))[0], Position(0, 0), Position(4, 4))
-        for step in path:
-            board[step].data['bgcolor'] = [255, 255, 192]
-    except KeyError:
-        pass
 mkboard()
 
 
