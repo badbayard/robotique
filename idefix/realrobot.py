@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-from classes import *
+from idefix import *
 from ev3dev.ev3 import *
-from time import sleep
-try:
-    from typing import Union, Optional, List
-except ImportError:
-    pass
+import pkgutil
+import json
 
 
 class ConsecutiveCounter:
@@ -36,26 +33,39 @@ class ConsecutiveCounter:
 
 
 class BotCalibration:
-    def __init__(self, color: BoardColorCalibration, pulses_per_cm: float):
+    def __init__(self, color: BoardColorCalibration, pulses_per_cm: float,
+                 pulses_per_90_degrees: float):
         self.color = color
         self.pulses_per_cm = pulses_per_cm
+        self.pulses_per_90_degrees = pulses_per_90_degrees
 
 
 class RealBot(Bot):
     DEFAULT_SPEED = 200
     CORRECT_SPEED = 40
     DEFAULT_ROTATE_SPEED = 100
-    PULSES_PER_DEG = None
+    ROTATE_PULSES_SLOWDOWN = 50
+    ROTATE_PULSES_SLOWDOWN_PER_STAY = 40
     CM_PER_CELL = 30
 
     def __init__(self, motor_l: LargeMotor, motor_r: LargeMotor,
-                 color_sensor: ColorSensor,
+                 distance_l: Optional[UltrasonicSensor],
+                 distance_f: Optional[UltrasonicSensor],
+                 distance_r: Optional[UltrasonicSensor],
+                 color_sensor: Optional[ColorSensor],
+                 gyro: Optional[GyroSensor],
                  calibration: BotCalibration,
                  *args, **kwargs):
         super(RealBot, self).__init__(*args, **kwargs)
         self.motor_l, self.motor_r = motor_l, motor_r
+        self.distance_l = distance_l
+        self.distance_f = distance_f
+        self.distance_r = distance_r
         self.color_sensor = color_sensor
+        self.gyro = gyro
         self.calibration = calibration
+        self.rotate_stays = 0
+        self.last_rotation_reldir = None
 
     def read_color(self) -> BoardColor:
         return BoardColor.from_itensity(
@@ -63,26 +73,39 @@ class RealBot(Bot):
             self.calibration.color)
 
     def move_cm(self, cm: float, speed: float = DEFAULT_SPEED):
+        if self.gyro is None:
+            self.move_cm_color(cm, speed)
+        else:
+            self.move_cm_gyro(cm, speed)
+
+    def move_cm_color(self, cm: float, speed: float):
+        self.rotate_stays = 0
         end = self.motor_l.position + self.calibration.pulses_per_cm * cm
-        #correct_dir = None
-        #supercorrecting = False
-        #supercorrecting_start =  None
+        # correct_dir = None
+        # supercorrecting = False
+        # supercorrecting_start =  None
+        if self.last_rotation_reldir in (RelativeDirection.Left, None):
+            self.motor_l.run_forever(speed_sp=speed - self.CORRECT_SPEED)
+            self.motor_r.run_forever(speed_sp=speed + self.CORRECT_SPEED)
+        else:
+            self.motor_l.run_forever(speed_sp=speed + self.CORRECT_SPEED)
+            self.motor_r.run_forever(speed_sp=speed - self.CORRECT_SPEED)
         while self.motor_l.position <= end:
             col = self.read_color()
-            if col == DirectionColorMap[self.dir][1]:
-                #if supercorrecting:
+            if col == DirectionColorMap[self.dir][1]:  # Correct left
+                # if supercorrecting:
                 #    supercorrecting = False
                 #   end += self.motor_l.position - supercorrecting_start
                 self.motor_l.run_forever(speed_sp=speed - self.CORRECT_SPEED)
                 self.motor_r.run_forever(speed_sp=speed + self.CORRECT_SPEED)
                 #correct_dir = RelativeDirection.Left
-            elif col == DirectionColorMap[self.dir][0]:
-                #if supercorrecting:
+            elif  col == DirectionColorMap[self.dir][0]:  # Correcy right
+                # if supercorrecting:
                 #    supercorrecting = False
                 #    end += self.motor_l.position - supercorrecting_start
                 self.motor_l.run_forever(speed_sp=speed + self.CORRECT_SPEED)
                 self.motor_r.run_forever(speed_sp=speed - self.CORRECT_SPEED)
-                #correct_dir = RelativeDirection.Right
+                # correct_dir = RelativeDirection.Right
             '''else:
                 supercorrecting = True
                 supercorrecting_start = self.motor_l.position
@@ -97,6 +120,9 @@ class RealBot(Bot):
                     pass'''
         self.motor_l.stop()
         self.motor_r.stop()
+
+    def move_cm_gyro(self, cm: float, speed: float):
+        raise NotImplementedError
 
     def wait_movement(self):
         self.motor_l.wait_while('running')
@@ -117,31 +143,62 @@ class RealBot(Bot):
         self.backward_cm(count * self.CM_PER_CELL, speed)
 
     def turn_left(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
-        self.motor_l.run_to_rel_pos(position_sp=500, speed_sp=-speed)
-        self.motor_r.run_to_rel_pos(position_sp=-500, speed_sp=speed)
+        if self.gyro is None:
+            self.turn_left_color(speed, *args, **kwargs)
+        else:
+            pass  # TODO
 
-        '''col_counter = ConsecutiveCounter(4)
-        self.rotate_left(speed)
+    def turn_left_color(self, speed: float, *args, **kwargs):
+        pulses = kwargs.get("pulses", self.calibration.pulses_per_90_degrees)
+        fast_pulses = pulses - min(
+            pulses,
+            self.ROTATE_PULSES_SLOWDOWN +
+            self.ROTATE_PULSES_SLOWDOWN_PER_STAY * self.rotate_stays)
+        print("FP: " + str(fast_pulses))
+        self.motor_l.run_to_rel_pos(position_sp=-fast_pulses, speed_sp=-speed)
+        self.motor_r.run_to_rel_pos(position_sp=fast_pulses, speed_sp=speed)
+        self.motor_l.wait_until_not_moving()
+        self.motor_r.wait_until_not_moving()
+
+        col_counter = ConsecutiveCounter(4)
+        self.rotate_left(speed / 2)
         target_dir = self.dir.apply_relative(RelativeDirection.Left)
         target_color = DirectionColorMap[target_dir][1]
-        while not col_counter.triggered_by(BoardColor.Wood):
-            col_counter(self.read_color())
-        while not col_counter.triggered_by(target_color):
-            col_counter(self.read_color())
-        self.stop()
-        self.dir = target_dir'''
-
-    def turn_right(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
-        col_counter = ConsecutiveCounter(4)
-        self.rotate_right(speed)
-        target_dir = self.dir.apply_relative(RelativeDirection.Right)
-        target_color = DirectionColorMap[target_dir][0]
-        while not col_counter.triggered_by(BoardColor.Wood):
-            col_counter(self.read_color())
         while not col_counter.triggered_by(target_color):
             col_counter(self.read_color())
         self.stop()
         self.dir = target_dir
+        self.last_rotation_reldir = RelativeDirection.Left
+        self.rotate_stays += 1
+
+    def turn_right(self, speed: float, *args, **kwargs):
+        if self.gyro is None:
+            self.turn_right_color(speed, *args, **kwargs)
+        else:
+            pass  # TODO
+
+    def turn_right_color(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
+        pulses = kwargs.get("pulses", self.calibration.pulses_per_90_degrees)
+        fast_pulses = pulses - min(
+            pulses,
+            self.ROTATE_PULSES_SLOWDOWN +
+            self.ROTATE_PULSES_SLOWDOWN_PER_STAY * self.rotate_stays)
+        print("FP: " + str(fast_pulses))
+        self.motor_l.run_to_rel_pos(position_sp=fast_pulses, speed_sp=speed)
+        self.motor_r.run_to_rel_pos(position_sp=-fast_pulses, speed_sp=-speed)
+        self.motor_l.wait_until_not_moving()
+        self.motor_r.wait_until_not_moving()
+
+        col_counter = ConsecutiveCounter(4)
+        self.rotate_right(speed / 2)
+        target_dir = self.dir.apply_relative(RelativeDirection.Right)
+        target_color = DirectionColorMap[target_dir][0]
+        while not col_counter.triggered_by(target_color):
+            col_counter(self.read_color())
+        self.stop()
+        self.dir = target_dir
+        self.last_rotation_reldir = RelativeDirection.Right
+        self.rotate_stays += 1
 
     def stop(self):
         self.motor_l.stop()
@@ -201,57 +258,69 @@ class RealBot(Bot):
         print("Direction: " + str(direction))
 
 
+CALIBRATION_JSON_FILENAME = 'robots.json'
+CALIBRATION_JSON = json.loads(pkgutil.get_data(
+    __package__, CALIBRATION_JSON_FILENAME).decode('utf-8'))
+
+
+def get_robot_calibration(hostname: str) -> BotCalibration:
+    for robot in CALIBRATION_JSON['robots']:
+        if robot['match_hostname'] == hostname:
+            cc = robot['sensor_colors']
+            return BotCalibration(
+                color=[
+                    ((cc['Black'][0], cc['Black'][1]), BoardColor.Black),
+                    ((cc['Wood'][0], cc['Wood'][1]), BoardColor.Wood),
+                    ((cc['Red'][0], cc['Red'][1]), BoardColor.Red),
+                    ((cc['White'][0], cc['White'][1]), BoardColor.White)
+                ],
+                pulses_per_cm=robot['pulses_per_cm'],
+                pulses_per_90_degrees=robot['pulses_per_90_degrees']
+            )
+    raise KeyError("No calibration for hostname '{}'".format(hostname))
+
+
 class EV3Bot(RealBot):
-    def __init__(self, *args, **kwargs):
-        color_sensor = ColorSensor('in4')
-        color_sensor.mode = 'COL-REFLECT'
-        m_l = LargeMotor('outB')
-        m_r = LargeMotor('outC')
+    def __init__(self, hostname, *args, **kwargs):
+        robot = None
+        for entry in CALIBRATION_JSON['robots']:
+            if entry['match_hostname'] == hostname:
+                robot = entry
+        if robot is None:
+            raise KeyError("No robot '{}'".format(hostname))
+        name = robot['name']
+        color = robot['color']
+
+        per = robot['peripherals']
+        try:
+            distance_l = UltrasonicSensor(per['distance_l'])
+        except KeyError:
+            distance_l = None
+        distance_f = UltrasonicSensor(per['distance_f'])
+        try:
+            distance_r = UltrasonicSensor(per['distance_r'])
+        except KeyError:
+            distance_r = None
+        try:
+            color_sensor = ColorSensor(per['color_sensor'])
+            color_sensor.mode = 'COL-REFLECT'
+        except KeyError:
+            color_sensor = None
+        try:
+            gyro = GyroSensor(per['gyro'])
+            gyro.mode = 'GYR-TILT'
+        except KeyError:
+            gyro = None
+        motor_l = LargeMotor(per['motor_l'])
+        motor_r = LargeMotor(per['motor_r'])
         super(EV3Bot, self).__init__(
-            m_l, m_r,
-            color_sensor,
-            *args, **kwargs)
-
-
-@enum.unique
-class RobotColor(enum.Enum):
-    Red = 96
-    Green = 97
-    Blue = 135
-
-
-def get_robot_calibration(color: RobotColor) -> BotCalibration:
-    if color == RobotColor.Red:
-        return BotCalibration(
-            color=[
-                ((0, 22), BoardColor.Black),
-                ((50, 65), BoardColor.Wood),
-                ((70, 90), BoardColor.Red),
-                ((92, 100), BoardColor.White)
-            ],
-            pulses_per_cm=35.2
-        )
-    if color == RobotColor.Green:
-        return BotCalibration(
-            color=[
-                ((0, 20), BoardColor.Black),
-                ((40, 55), BoardColor.Wood),
-                ((58, 75), BoardColor.Red),
-                ((80, 100), BoardColor.White)
-            ],
-            pulses_per_cm=35.2
-        )
-    if color == RobotColor.Blue:
-        return BotCalibration(
-            color=[
-                ((0, 20), BoardColor.Black),
-                ((50, 65), BoardColor.Wood),
-                ((70, 85), BoardColor.Red),
-                ((90, 100), BoardColor.White)
-            ],
-            pulses_per_cm=35.2
-        )
-    raise ValueError
+            motor_l, motor_r,
+            distance_l, distance_f, distance_r,
+            color_sensor, gyro,
+            *args,
+            name=name,
+            color=color,
+            **kwargs)
 
 
 if __name__ == '__main__':
@@ -266,16 +335,11 @@ if __name__ == '__main__':
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
         '''
 
-    calib = get_robot_calibration(RobotColor.Green)
+    calib = get_robot_calibration('green')
     b = Board(8, 8)
     bot = EV3Bot(calib, board=b)
 
     try:
-        bot.turn_left()
-        while True:
-            time.sleep(1)
-        print("done")
-        sys.exit(0)
         bot.find_direction()
         print('Found dir', bot.dir)
         print('Motor L', bot.motor_l.position, 'Motor R', bot.motor_r.position)

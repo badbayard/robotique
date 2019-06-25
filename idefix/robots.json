@@ -1,0 +1,54 @@
+{
+  "robots": [
+    {
+      "name": "red",
+      "match_hostname": "red",
+      "color": [255, 0, 0],
+      "ip": "192.168.1.96",
+      "peripherals": {
+        "distance_f": "in1",
+        "distance_l": "in2",
+        "distance_r": "in3",
+        "gyro": "in4",
+        "motor_l": "outB",
+        "morot_r": "outC"
+      },
+      "sensor_colors": {
+        "Black": [0, 22],
+        "Wood": [50, 65],
+        "Red": [70, 90],
+        "White": [92, 100]
+      },
+      "pulses_per_cm": 35.2,
+      "pulses_per_90_degrees": 490
+    },
+    {
+      "name": "green",
+      "color": [0, 255, 0],
+      "match_hostname": "green",
+      "ip": "192.168.1.97",
+      "sensor_colors": {
+        "Black": [0, 20],
+        "Wood": [40, 55],
+        "Red": [58, 75],
+        "White": [80, 100]
+      },
+      "pulses_per_cm": 35.2,
+      "pulses_per_90_degrees": 490
+    },
+    {
+      "name": "blue",
+      "color": [0, 0, 255],
+      "match_hostname": "blue",
+      "ip": "192.168.1.135",
+      "sensor_colors": {
+        "Black": [0, 20],
+        "Wood": [50, 65],
+        "Red": [70, 85],
+        "White": [90, 100]
+      },
+      "pulses_per_cm": 35.2,
+      "pulses_per_90_degrees": 490
+    }
+  ]
+} 
