@@ -55,7 +55,10 @@ class ForwardCommand(REPLCommand):
     SHORTHAND = 'f'
 
     def __call__(self, ctx: REPLContext, *args, **kwargs):
-        ctx.bot.forward()
+        if len(args) == 1:
+            ctx.bot.forward(int(args[0]))
+        else:
+            ctx.bot.forward()
 
 
 @command
@@ -179,9 +182,8 @@ def repl(ctx: REPLContext):
 
 
 if __name__ == '__main__':
-    calib = get_robot_calibration(platform.node())
     b = Board(8, 8)
-    bot = EV3Bot(calib, board=b)
+    bot = EV3Bot(platform.node(), board=b)
 
     repl(REPLContext(b, bot))
     bot.stop()

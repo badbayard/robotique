@@ -55,6 +55,7 @@ class RealBot(Bot):
                  color_sensor: Optional[ColorSensor],
                  gyro: Optional[GyroSensor],
                  calibration: BotCalibration,
+                 board: Board,
                  *args, **kwargs):
         super(RealBot, self).__init__(*args, **kwargs)
         self.motor_l, self.motor_r = motor_l, motor_r
@@ -171,13 +172,13 @@ class RealBot(Bot):
         self.last_rotation_reldir = RelativeDirection.Left
         self.rotate_stays += 1
 
-    def turn_right(self, speed: float, *args, **kwargs):
+    def turn_right(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
         if self.gyro is None:
             self.turn_right_color(speed, *args, **kwargs)
         else:
             pass  # TODO
 
-    def turn_right_color(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
+    def turn_right_color(self, speed: float, *args, **kwargs):
         pulses = kwargs.get("pulses", self.calibration.pulses_per_90_degrees)
         fast_pulses = pulses - min(
             pulses,
@@ -257,6 +258,12 @@ class RealBot(Bot):
 
         print("Direction: " + str(direction))
 
+    def wall(self, dir: Union[Direction, RelativeDirection]) -> Wall:
+        raise NotImplementedError
+
+    def write_info(self, board: Board, *args, **kwargs):
+        raise NotImplementedError
+
 
 CALIBRATION_JSON_FILENAME = 'robots.json'
 CALIBRATION_JSON = json.loads(pkgutil.get_data(
@@ -317,6 +324,7 @@ class EV3Bot(RealBot):
             motor_l, motor_r,
             distance_l, distance_f, distance_r,
             color_sensor, gyro,
+            get_robot_calibration(hostname),
             *args,
             name=name,
             color=color,
@@ -335,9 +343,9 @@ if __name__ == '__main__':
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
         '''
 
-    calib = get_robot_calibration('green')
     b = Board(8, 8)
-    bot = EV3Bot(calib, board=b)
+    import platform
+    bot = EV3Bot(platform.node(), board=b)
 
     try:
         bot.find_direction()
