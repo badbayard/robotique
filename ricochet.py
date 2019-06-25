@@ -1,5 +1,3 @@
-from ev3dev.ev3 import *
-import ev3dev.ev3 as ev3
 from time import sleep
 from typing import Callable
 
@@ -178,14 +176,15 @@ def precompute_minimum_moves(game: Game):
             for j in range(1, 5):
                 index = i
                 while not HAS_WALL(game.grid[index], direction):
+                    index += OFFSET[direction]
                     if game.moves[index] > depth:
                         game.moves[index] = depth
                         status[index] = True
                         done = False
                     
                 direction*=2
-    for i in grid.moves
-        print(grid.moves[i])
+    #for i in grid.moves
+    #    print(grid.moves[i])
 
 
 _nodes = 0
@@ -241,7 +240,7 @@ def search(game: Game, path: chr, callback: Callable[[int, int, int, int], None]
     if game_over(game):
         return 0
     result = 0
-    printf("Start Search")
+    print("Start Search")
     precompute_minimum_moves(game)
     for max_depth in range(1, MAX_DEPTH):
         global _nodes
@@ -250,9 +249,9 @@ def search(game: Game, path: chr, callback: Callable[[int, int, int, int], None]
         _nodes = 0
         _hits = 0
         _inner = 0
-        printf("Start step")
+        print("Start step")
         result = _search(game, 0, max_depth, path)
-        printf("End Step")
+        print("End Step")
         if callback:
             callback(max_depth, _nodes, _inner, _hits)
         if result:
@@ -266,9 +265,10 @@ def _callback(depth, nodes, inner,  hits):
 
 if __name__ == "__main__":
     game = Game()
-    game.grid = [13,8,8,8,9,5,4,0,0,1,4,0,1,0,1,4,0,0,0,1,6,2,2,2,3]
+    game.grid = [13,8,8,8,9,5,4,0,0,1,4,0,1,0,1,4,0,0,0,1,6,2,2,2,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     OFFSET = [0,1,5,0,-1,0,0,0,-5]
     game.robots = [4, 20, 24]
-    game.token = 54
-    path = [] * 32
+    game.token = 13
+    path = [] * MAX_DEPTH
+    print(len(path))
     search(game, path, _callback)
