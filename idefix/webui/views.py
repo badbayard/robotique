@@ -4,7 +4,7 @@ from typing import List, Iterator
 from flask import render_template, Markup, jsonify
 
 from idefix import Board, FakeBot, Bot, Wall, Direction, Position, boardgen, \
-    astar, RelativeDirection
+    astar, RelativeDirection, discovery
 from idefix.proxy import ProxyBot
 from idefix.webui import app
 
@@ -82,82 +82,20 @@ class HTMLTableBoardView:
 board = None  # type: Board
 discoveryboard = None  # type: Board
 bot = None  # type: ProxyBot
-discovery = None  # type: Iterator
-
-
-def run_discovery():
-    # On tourne pour savoir l'état des 4 murs autour du robot
-    def mark_candidates(candidates):
-        for cell in candidates:
-            if Wall.No in (
-                    cell.wall(Direction.North), cell.wall(Direction.East),
-                    cell.wall(Direction.South), cell.wall(Direction.West)):
-                cell.data['bgcolor'] = [255, 255, 128]
-
-    def get_candidates() -> List[Board.Cell]:
-        ret = []
-        for y in range(discoveryboard.min_y, discoveryboard.max_y + 1):
-            for x in range(discoveryboard.min_x, discoveryboard.max_x + 1):
-                cell = discoveryboard[Position(x, y)]
-                if cell.explored:
-                    continue
-                if Wall.No in (
-                        cell.wall(Direction.North), cell.wall(Direction.East),
-                        cell.wall(Direction.South), cell.wall(Direction.West)):
-                    ret.append(cell)
-        return ret
-    bot.write_info(discoveryboard)
-    mark_candidates(get_candidates())
-    yield []
-    bot.turn_left()
-    bot.write_info(discoveryboard)
-    mark_candidates(get_candidates())
-    yield bot.command_list
-    bot.clear_command_list()
-    while True:
-        candidates = get_candidates()
-        if len(candidates) == 0:
-            break
-        candidates_paths = [*map(
-            lambda d: astar.path(discoveryboard, bot.pos, d.pos), candidates)]
-        shortest_idx = min(enumerate(candidates_paths),
-                           key=lambda x: len(x[1]))[0]
-
-        path = candidates_paths[shortest_idx]
-        nextpos = path[1]  # type: Position
-        nextdir = None
-        for d in (Direction.North, Direction.East,
-                  Direction.South, Direction.West):
-            if nextpos == bot.pos.move(d):
-                nextdir = d
-        reldir = bot.dir.get_relative(nextdir)
-        if reldir == RelativeDirection.Front:
-            bot.forward()
-        elif reldir == RelativeDirection.Right:
-            bot.turn_right()
-        elif reldir == RelativeDirection.Back:
-            bot.turn_right()
-            bot.turn_right()
-        elif reldir == RelativeDirection.Left:
-            bot.turn_left()
-        mark_candidates(candidates)
-        candidates[shortest_idx].data['bgcolor'] = [255, 255, 0]
-        bot.write_info(discoveryboard)
-        discoveryboard[bot.pos].data.pop('bgcolor', None)
-
-        yield bot.command_list
-        bot.clear_command_list()
+disc = None  # type: Iterator
 
 
 def mkboard():
-    global board, discoveryboard, bot, discovery
+    global board, discoveryboard, bot, disc
     board = boardgen.generate_board(5, 5)
     discoveryboard = Board(5, 5)
     fakebot = FakeBot(board)
     fakebot.dir = Direction.East
     fakebot.write_info(discoveryboard)
     bot = ProxyBot(fakebot)
-    discovery = run_discovery()
+    disc = discovery.run(discoveryboard, bot)
+
+
 mkboard()
 
 
@@ -170,7 +108,7 @@ def index():
 
 @app.route('/step')
 def step():
-    commands = next(discovery)
+    commands = next(disc)
     view = HTMLTableBoardView(discoveryboard, [bot])
     viewreal = HTMLTableBoardView(board, [bot])
     return jsonify({

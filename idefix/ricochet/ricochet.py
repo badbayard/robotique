@@ -3,8 +3,7 @@ from ctypes import *
 COLORS = {
     0: 'R',
     1: 'G',
-    2: 'B',
-    #3: 'Y',
+    2: 'B'
 }
 
 DIRECTIONS = {
@@ -16,6 +15,7 @@ DIRECTIONS = {
 
 dll = CDLL('./_ricochet')
 
+
 class Game(Structure):
     _fields_ = [
         ('grid', c_uint * 256),
@@ -25,7 +25,9 @@ class Game(Structure):
         ('last', c_uint),
     ]
 
+
 CALLBACK_FUNC = CFUNCTYPE(None, c_uint, c_uint, c_uint, c_uint)
+
 
 def search(game, callback=None):
     callback = CALLBACK_FUNC(callback) if callback else None
@@ -49,6 +51,7 @@ def search(game, callback=None):
         direction = DIRECTIONS[value & 0x0f]
         result.append((color, direction))
     return result
+
 
 if __name__ == '__main__':
     import model
