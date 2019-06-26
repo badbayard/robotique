@@ -28,8 +28,16 @@ class ConsecutiveCounter:
     def triggered(self):
         return self.count >= self.trigger
 
-    def triggered_by(self, value):
-        return self.count >= self.trigger and self.value == value
+    def triggered_by(self, value, count: int = 0):
+        if not self.value == value:
+            return False
+        if count == 0:
+            return self.count >= self.trigger
+        return self.count >= count
+
+    def print(self):
+        print(('\n' if self.count == 1 else '') +
+              '\r{} x {}'.format(self.value, self.count), end='')
 
 
 class BotCalibration:
@@ -44,8 +52,9 @@ class RealBot(Bot):
     DEFAULT_SPEED = 200
     CORRECT_SPEED = 40
     DEFAULT_ROTATE_SPEED = 100
-    ROTATE_PULSES_SLOWDOWN = 50
+    ROTATE_PULSES_SLOWDOWN = 150
     ROTATE_PULSES_SLOWDOWN_PER_STAY = 40
+    ROTATE_SLOWDOWN_SPEED = 70
     CM_PER_CELL = 30
 
     def __init__(self, motor_l: LargeMotor, motor_r: LargeMotor,
@@ -82,43 +91,52 @@ class RealBot(Bot):
     def move_cm_color(self, cm: float, speed: float):
         self.rotate_stays = 0
         end = self.motor_l.position + self.calibration.pulses_per_cm * cm
-        # correct_dir = None
-        # supercorrecting = False
-        # supercorrecting_start =  None
+        correct_dir = None
         if self.last_rotation_reldir in (RelativeDirection.Left, None):
             self.motor_l.run_forever(speed_sp=speed - self.CORRECT_SPEED)
             self.motor_r.run_forever(speed_sp=speed + self.CORRECT_SPEED)
         else:
             self.motor_l.run_forever(speed_sp=speed + self.CORRECT_SPEED)
             self.motor_r.run_forever(speed_sp=speed - self.CORRECT_SPEED)
+        col_counter = ConsecutiveCounter(20)
         while self.motor_l.position <= end:
             col = self.read_color()
-            if col == DirectionColorMap[self.dir][1]:  # Correct left
-                # if supercorrecting:
-                #    supercorrecting = False
-                #   end += self.motor_l.position - supercorrecting_start
+            col_counter(col)
+            col_counter.print()
+            if col_counter.triggered_by(DirectionColorMap[self.dir][1], 3):
+                # Correct left
+                correct_dir = RelativeDirection.Left
                 self.motor_l.run_forever(speed_sp=speed - self.CORRECT_SPEED)
                 self.motor_r.run_forever(speed_sp=speed + self.CORRECT_SPEED)
-                #correct_dir = RelativeDirection.Left
-            elif  col == DirectionColorMap[self.dir][0]:  # Correcy right
-                # if supercorrecting:
-                #    supercorrecting = False
-                #    end += self.motor_l.position - supercorrecting_start
+            elif col_counter.triggered_by(DirectionColorMap[self.dir][0], 3):
+                # Correct right
+                correct_dir = RelativeDirection.Right
                 self.motor_l.run_forever(speed_sp=speed + self.CORRECT_SPEED)
                 self.motor_r.run_forever(speed_sp=speed - self.CORRECT_SPEED)
-                # correct_dir = RelativeDirection.Right
-            '''else:
-                supercorrecting = True
-                supercorrecting_start = self.motor_l.position
-                if correct_dir is None:
-                    correct_dir = RelativeDirection.Right
+            elif correct_dir is not None and col_counter.triggered_by(
+                    BoardColor.Wood):
+                self.motor_l.stop()
+                self.motor_r.stop()
+
                 if correct_dir == RelativeDirection.Left:
-                    self.motor_l.run_forever(
-                        speed_sp=speed - self.CORRECT_SPEED)
-                    self.motor_r.run_forever(
-                        speed_sp=speed + self.CORRECT_SPEED)
+                    self.motor_l.run_forever(speed_sp=-self.CORRECT_SPEED)
+                    self.motor_r.run_forever(speed_sp=self.CORRECT_SPEED)
+                    while True:
+                        col = self.read_color()
+                        col_counter(col)
+                        col_counter.print()
+                        if col == DirectionColorMap[self.dir][1]:
+                            break
                 elif correct_dir == RelativeDirection.Right:
-                    pass'''
+                    self.motor_l.run_forever(speed_sp=self.CORRECT_SPEED)
+                    self.motor_r.run_forever(speed_sp=-self.CORRECT_SPEED)
+                    while True:
+                        col = self.read_color()
+                        col_counter(col)
+                        col_counter.print()
+                        if col == DirectionColorMap[self.dir][0]:
+                            break
+        print('')
         self.motor_l.stop()
         self.motor_r.stop()
 
@@ -162,7 +180,7 @@ class RealBot(Bot):
         self.motor_r.wait_until_not_moving()
 
         col_counter = ConsecutiveCounter(4)
-        self.rotate_left(speed / 2)
+        self.rotate_left(self.ROTATE_SLOWDOWN_SPEED)
         target_dir = self.dir.apply_relative(RelativeDirection.Left)
         target_color = DirectionColorMap[target_dir][1]
         while not col_counter.triggered_by(target_color):
@@ -191,7 +209,7 @@ class RealBot(Bot):
         self.motor_r.wait_until_not_moving()
 
         col_counter = ConsecutiveCounter(4)
-        self.rotate_right(speed / 2)
+        self.rotate_right(self.ROTATE_SLOWDOWN_SPEED)
         target_dir = self.dir.apply_relative(RelativeDirection.Right)
         target_color = DirectionColorMap[target_dir][0]
         while not col_counter.triggered_by(target_color):

@@ -66,6 +66,13 @@ class Position:
         }.get(dir)
         return Position(self._x + delta[0], self._y + delta[1])
 
+    def get_direction_to(self, pos: 'Position') -> 'Direction':
+        return {
+            (0, -1): Direction.North,
+            (1, 0): Direction.East,
+            (0, 1): Direction.South,
+            (-1, 0): Direction.West
+        }[(pos._x - self._x, pos._y - self._y)]
 
 @enum.unique
 class RelativeDirection(enum.Enum):
