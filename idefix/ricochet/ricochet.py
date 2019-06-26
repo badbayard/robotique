@@ -45,7 +45,6 @@ def search(game, callback=None):
     depth = dll.search(byref(game), path, callback)
     result = []
     for value in path.raw[:depth]:
-        value = ord(value)
         color = colors[(value >> 4) & 0x0f]
         direction = DIRECTIONS[value & 0x0f]
         result.append((color, direction))
@@ -60,14 +59,14 @@ if __name__ == '__main__':
     best = (0, 0)
     hist = collections.defaultdict(int)
     def callback(depth, nodes, inner, hits):
-        print 'Depth: %d, Nodes: %d (%d inner, %d hits)' % (depth, nodes, inner, hits)
+        print('Depth: %d, Nodes: %d (%d inner, %d hits)' % (depth, nodes, inner, hits))
     seed = 0
     while True:
         count += 1
         #seed = random.randint(0, 0x7fffffff)
         seed += 1
         start = time.clock()
-        path = search(model.Game(seed))#, callback)
+        path = search(model.Game(seed))  #, callback)
         moves = len(path)
         hist[moves] += 1
         key = (moves, seed)
@@ -78,4 +77,4 @@ if __name__ == '__main__':
         duration = time.clock() - start
         #print '%d. %2d (%.3f) %s [%s]'% (count, moves, duration, best, path)
         #print dict(hist)
-        print '%d %d [%s]' % (seed, moves, path)
+        print('%d %d [%s]' % (seed, moves, path))

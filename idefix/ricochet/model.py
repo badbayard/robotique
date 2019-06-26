@@ -176,7 +176,7 @@ def idx(x, y, size=16):
 
 def xy(index, size=16):
     x = index % size
-    y = index / size
+    y = index // size
     return (x, y)
 
 def rotate_quad(data, times=1):
@@ -246,7 +246,7 @@ class Game(object):
                 break
         return result
     def get_robot(self, index):
-        for color, position in self.robots.iteritems():
+        for color, position in self.robots.items():
             if position == index:
                 return color
         return None
@@ -257,7 +257,7 @@ class Game(object):
         if direction in self.grid[index]:
             return False
         new_index = index + OFFSET[direction]
-        if new_index in self.robots.itervalues():
+        if new_index in self.robots.values():
             return False
         return True
     def compute_move(self, color, direction):
