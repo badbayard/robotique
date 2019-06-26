@@ -27,20 +27,26 @@ def run(board: Board, bot: ProxyBot):
         return ret
     bot.write_info(board)
     mark_candidates(get_candidates())
-    yield []
-    bot.turn_left()
-    bot.write_info(board)
-    mark_candidates(get_candidates())
     yield bot.command_list
     bot.clear_command_list()
+    bot.turn_left()
+
     while True:
+        bot.write_info(board)
         candidates = get_candidates()
         if len(candidates) == 0:
             break
+        mark_candidates(candidates)
+
         candidates_paths = [*map(
             lambda d: astar.path(board, bot.pos, d.pos), candidates)]
         shortest_idx = min(enumerate(candidates_paths),
                            key=lambda x: len(x[1]))[0]
+
+        candidates[shortest_idx].data['bgcolor'] = [255, 255, 0]
+
+        yield bot.command_list
+        bot.clear_command_list()
 
         path = candidates_paths[shortest_idx]
         nextpos = path[1]  # type: Position
@@ -59,10 +65,6 @@ def run(board: Board, bot: ProxyBot):
             bot.turn_right()
         elif reldir == RelativeDirection.Left:
             bot.turn_left()
-        mark_candidates(candidates)
-        candidates[shortest_idx].data['bgcolor'] = [255, 255, 0]
-        bot.write_info(board)
+
         board[bot.pos].data.pop('bgcolor', None)
 
-        yield bot.command_list
-        bot.clear_command_list()

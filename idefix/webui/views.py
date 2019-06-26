@@ -1,10 +1,10 @@
 from io import StringIO
-from typing import List, Iterator
+from typing import List, Iterator, Optional
 
-from flask import render_template, Markup, jsonify
+from flask import render_template, Markup, jsonify, request
 
 from idefix import Board, FakeBot, Bot, Wall, Direction, Position, boardgen, \
-    astar, RelativeDirection, discovery
+    RelativeDirection, discovery
 from idefix.proxy import ProxyBot
 from idefix.webui import app
 
@@ -70,7 +70,7 @@ class HTMLTableBoardView:
                     out.write('background-color:rgba({},{},{},{})'.format(
                         *bgcolor))
                 # out.write(';'.join(styles))
-                out.write('">')
+                out.write('" data-x="{}" data-y="{}">'.format(x, y))
                 out.write(content)
                 out.write('</td>')
             out.write('</tr>')
@@ -78,56 +78,116 @@ class HTMLTableBoardView:
         return out.getvalue()
 
 
-# TODO: virer tout ça
-board = None  # type: Board
-discoveryboard = None  # type: Board
-bot = None  # type: ProxyBot
-disc = None  # type: Iterator
+class Context:
+    def __init__(self):
+        self.realboard = None  # type: Board
+        self.board = None  # type: Board
+        self.red = None  # type: ProxyBot
+        self.green = None  # type: ProxyBot
+        self.blue = None  # type: ProxyBot
+        self.bots = None  # type: List[ProxyBot]
+        self.disc = None  # type: Iterator
+
+    def make_board_discovery(self):
+        self.realboard = boardgen.generate_board(5, 5)
+        self.board = Board(5, 5)
+        fakebot = FakeBot(self.realboard)
+        fakebot.dir = Direction.East
+        fakebot.write_info(self.board)
+        self.red = ProxyBot(fakebot)
+        self.bots = [self.red]
+        self.disc = discovery.run(self.board, self.red)
+
+    def _find_empty_cell(self):
+        for y in range(self.board.min_y, self.board.max_y + 1):
+            for x in range(self.board.min_x, self.board.max_x + 1):
+                pos = Position(x, y)
+                cell = self.board[pos]
+                if cell.explored or any([bot.pos == pos for bot in self.bots]):
+                    continue
+                return cell
+
+    def prepare_game(self):
+        self.green = ProxyBot(FakeBot(
+            self.board, name='green', color=[0, 255, 0]))
+        self.blue = ProxyBot(FakeBot(
+            self.board, name='blue', color=[0, 0, 255]))
+        self.bots = [self.red, self.green, self.blue]
+        self.green.pos = self._find_empty_cell().pos
+        self.blue.pos = self._find_empty_cell().pos
 
 
-def mkboard():
-    global board, discoveryboard, bot, disc
-    board = boardgen.generate_board(5, 5)
-    discoveryboard = Board(5, 5)
-    fakebot = FakeBot(board)
-    fakebot.dir = Direction.East
-    fakebot.write_info(discoveryboard)
-    bot = ProxyBot(fakebot)
-    disc = discovery.run(discoveryboard, bot)
-
-
-mkboard()
+ctx = Context()
+ctx.make_board_discovery()
 
 
 @app.route('/')
 def index():
-    view = HTMLTableBoardView(discoveryboard, [bot])
-    viewreal = HTMLTableBoardView(board, [bot])
-    return render_template("index.html", board1=Markup(view.render() + viewreal.render()))
+    view = HTMLTableBoardView(ctx.board, ctx.bots)
+    viewreal = HTMLTableBoardView(ctx.realboard, ctx.bots)
+    return render_template("index.html", board1=Markup(view.render()))
 
 
-@app.route('/step')
-def step():
-    commands = next(disc)
-    view = HTMLTableBoardView(discoveryboard, [bot])
-    viewreal = HTMLTableBoardView(board, [bot])
-    return jsonify({
-        'board': view.render()+viewreal.render(),
-        'commands': commands
-    })
+def _render(commands: Optional[List] = None,
+            discovery_end: Optional[bool] = None):
+    view = HTMLTableBoardView(ctx.board, ctx.bots)
+    viewreal = HTMLTableBoardView(ctx.realboard, ctx.bots)
+    json = {
+        'board': view.render(),
+        'realboard': viewreal.render()
+    }
+    if commands is not None:
+        json['commands'] = commands
+    if discovery_end is not None:
+        json['discovery_end'] = discovery_end
+    return jsonify(json)
+
+
+@app.route('/step_discovery')
+def step_discovery():
+    try:
+        commands = next(ctx.disc)
+    except StopIteration:
+        commands = None
+    return _render(commands=commands, discovery_end=commands is None)
+
+
+@app.route('/auto_discovery')
+def auto_discovery():
+    commands = []
+    try:
+        while True:
+            commands.extend(next(ctx.disc))
+    except StopIteration:
+        pass
+    return _render(commands=commands)
 
 
 @app.route('/reset')
 def reset():
-    mkboard()
-    view = HTMLTableBoardView(discoveryboard, [bot])
-    viewreal = HTMLTableBoardView(board, [bot])
-    return jsonify({
-        'board': view.render()+viewreal.render(),
-        'commands': []
-    })
+    global ctx
+    ctx = Context()
+    ctx.make_board_discovery()
+    return _render()
 
 
-@app.route('/about')
-def about():
-    return render_template("about.html")
+@app.route('/prepare_game')
+def prepare_game():
+    ctx.prepare_game()
+    return _render()
+
+
+@app.route('/place_bot')
+def place_bot():
+    x = int(request.args.get('x'))
+    y = int(request.args.get('y'))
+    botname = request.args.get('bot')
+    bot = [b for b in ctx.bots if b.name == botname][0]
+    newpos = Position(x, y)
+    if bot.dir == Direction.Unknown:
+        bot.dir = Direction.North
+    if bot.pos == newpos:
+        bot.dir = bot.dir.apply_relative(RelativeDirection.Right)
+    else:
+        bot.pos = newpos
+    return _render()

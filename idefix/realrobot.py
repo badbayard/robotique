@@ -154,13 +154,6 @@ class RealBot(Bot):
                 *args, **kwargs) -> None:
         self.forward_cm(count * self.CM_PER_CELL, speed)
 
-    def backward_cm(self, cm: float, speed: float = DEFAULT_SPEED):
-        self.move_cm(-cm, speed)
-
-    def backward(self, count: int = 1, speed: float = DEFAULT_SPEED,
-                 *args, **kwargs) -> None:
-        self.backward_cm(count * self.CM_PER_CELL, speed)
-
     def turn_left(self, speed: float = DEFAULT_ROTATE_SPEED, *args, **kwargs):
         if self.gyro is None:
             self.turn_left_color(speed, *args, **kwargs)
@@ -288,31 +281,31 @@ CALIBRATION_JSON = json.loads(pkgutil.get_data(
     __package__, CALIBRATION_JSON_FILENAME).decode('utf-8'))
 
 
+def robot_json_entry(hostname: str):
+    for entry in CALIBRATION_JSON['robots']:
+        if entry['match_hostname'] == hostname:
+            return entry
+    raise KeyError("No robot '{}'".format(hostname))
+
+
 def get_robot_calibration(hostname: str) -> BotCalibration:
-    for robot in CALIBRATION_JSON['robots']:
-        if robot['match_hostname'] == hostname:
-            cc = robot['sensor_colors']
-            return BotCalibration(
-                color=[
-                    ((cc['Black'][0], cc['Black'][1]), BoardColor.Black),
-                    ((cc['Wood'][0], cc['Wood'][1]), BoardColor.Wood),
-                    ((cc['Red'][0], cc['Red'][1]), BoardColor.Red),
-                    ((cc['White'][0], cc['White'][1]), BoardColor.White)
-                ],
-                pulses_per_cm=robot['pulses_per_cm'],
-                pulses_per_90_degrees=robot['pulses_per_90_degrees']
-            )
-    raise KeyError("No calibration for hostname '{}'".format(hostname))
+    robot = robot_json_entry(hostname)
+    cc = robot['sensor_colors']
+    return BotCalibration(
+        color=[
+            ((cc['Black'][0], cc['Black'][1]), BoardColor.Black),
+            ((cc['Wood'][0], cc['Wood'][1]), BoardColor.Wood),
+            ((cc['Red'][0], cc['Red'][1]), BoardColor.Red),
+            ((cc['White'][0], cc['White'][1]), BoardColor.White)
+        ],
+        pulses_per_cm=robot['pulses_per_cm'],
+        pulses_per_90_degrees=robot['pulses_per_90_degrees']
+    )
 
 
 class EV3Bot(RealBot):
     def __init__(self, hostname, *args, **kwargs):
-        robot = None
-        for entry in CALIBRATION_JSON['robots']:
-            if entry['match_hostname'] == hostname:
-                robot = entry
-        if robot is None:
-            raise KeyError("No robot '{}'".format(hostname))
+        robot = robot_json_entry(hostname)
         name = robot['name']
         color = robot['color']
 

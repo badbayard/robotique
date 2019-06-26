@@ -1,59 +1,177 @@
 {% extends "base.html" %}
 {% block title %}Home{% endblock %}
 {% block body %}
-<div class="pure-u-3-4" id="boardcontainer">{{ board1 }}</div>
+<div class="pure-u-3-4" id="boardcontainer">
+  <div id="board-display">{{ board1 }}</div>
+  <div id="board-real-display"></div>
+</div>
 <div class="pure-u-1-4" id="rightpanel">
   <div>
-    <button class="pure-button" id="btn-step">Step</button>
-    <button class="pure-button" id="btn-reset">Reset</button>
+    <div>
+      <button class="pure-button" id="btn-reset" style="width:100%">Reset</button>
+    </div>
+    <div class="section">
+      <h4>Discovery</h4>
+      <button class="pure-button" id="btn-step-discovery">Step</button>
+      <button class="pure-button" id="btn-auto-discovery">Auto</button>
+    </div>
+    <div class="section">
+      <h4>Game setup</h4>
+      <button class="pure-button" id="btn-prepare-game">Prepare</button><br>
+      Place
+      <button class="pure-button" id="btn-place-red">R</button>
+      <button class="pure-button" id="btn-place-green">G</button>
+      <button class="pure-button" id="btn-place-blue">B</button>
+      <br>
+      <button class="pure-button" id="btn-step-game">Step</button>
+    </div>
   </div>
   <div id="commandlog"></div>
 </div>
 <script>
 function $(x) { return document.getElementById(x); }
+function $xhr(method, url, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState !== XMLHttpRequest.DONE) {
+            return;
+        }
+        if (xhr.status === 200) {
+            callback(xhr);
+        } else {
+            alert('There was a problem with the request.');
+        }
+    };
+    xhr.open(method, url, true);
+    xhr.send();
+}
 
-function parseBoardResponse(text) {
-    const json = JSON.parse(text);
-    $('boardcontainer').innerHTML = json['board'];
+function parseBoardResponse(json) {
+    $('board-display').innerHTML = json['board'];
+    $('board-real-display').innerHTML = json['realboard'];
     const log = $('commandlog');
-    for (const cmdline of json['commands']){
-        const line = document.createElement('div');
-        line.classList.add('line');
-        line.classList.add('b-' + cmdline.bot);
-        line.innerText = cmdline.cmd;
-        log.appendChild(line);
+    if (json['commands'] !== undefined) {
+        for (const cmdline of json['commands']){
+            const line = document.createElement('div');
+            line.classList.add('line');
+            line.classList.add('b-' + cmdline.bot);
+            line.innerText = cmdline.cmd;
+            log.appendChild(line);
+        }
+        log.scrollTop = log.scrollHeight;  // Scroll to bottom
+    }
+    setBoardMouseEvents();
+}
+
+$('btn-step-discovery').addEventListener('click', (event) => {
+    $xhr('GET', '/step_discovery', (xhr) => {
+        const json = JSON.parse(xhr.responseText);
+        parseBoardResponse(json);
+        if (json.discovery_end !== true) {
+            $('btn-step-discovery').disabled = false;
+            $('btn-auto-discovery').disabled = false;
+        }
+    });
+    $('btn-step-discovery').disabled = true;
+    $('btn-auto-discovery').disabled = true;
+}, false);
+$('btn-auto-discovery').addEventListener('click', (event) => {
+    $xhr('GET', '/auto_discovery', (xhr) => {
+        const json = JSON.parse(xhr.responseText);
+        parseBoardResponse(json);
+    });
+    $('btn-step-discovery').disabled = true;
+    $('btn-auto-discovery').disabled = true;
+}, false);
+$('btn-reset').addEventListener('click', (event) => {
+    $xhr('GET', '/reset', (xhr) => {
+        const json = JSON.parse(xhr.responseText);
+        parseBoardResponse(json);
+    });
+    $('btn-step-discovery').disabled = false;
+    $('btn-auto-discovery').disabled = false;
+}, false);
+
+function cellMouseEnter(event) {
+    const cell = event.target;
+    if (placingRobot !== null) {
+        cell.classList.add('hover-' + placingRobot);
+    }
+}
+function cellMouseLeave(event) {
+    const cell = event.target;
+    if (placingRobot !== null) {
+        cell.classList.remove('hover-' + placingRobot);
+    }
+}
+function cellMouseClick(event) {
+    if (placingRobot === null) {
+        return;
+    }
+    const cell = event.target;
+    const x = cell.dataset.x, y = cell.dataset.y;
+    $xhr('GET', '/place_bot?x=' + x + '&y=' + y + '&bot=' + placingRobot, (xhr) => {
+        const json = JSON.parse(xhr.responseText);
+        parseBoardResponse(json);
+    });
+}
+function setBoardMouseEvents() {
+    const cells = $('board-display').querySelectorAll('td');
+    for (let cell of cells) {
+        cell.onmouseenter = cellMouseEnter;
+        cell.onmouseleave = cellMouseLeave;
+        cell.onclick = cellMouseClick;
     }
 }
 
-$('btn-step').addEventListener('click', (event) => {
-    var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState !== XMLHttpRequest.DONE) {
-            return;
-        }
-        if (xhr.status === 200) {
-            parseBoardResponse(xhr.responseText);
-        } else {
-            alert('There was a problem with the request.');
-        }
-    };
-    xhr.open('GET', '/step', true);
-    xhr.send();
+setBoardMouseEvents();
+
+const btnPlaceRed = $('btn-place-red'),
+      btnPlaceGreen = $('btn-place-green'),
+      btnPlaceBlue = $('btn-place-blue');
+let placingRobot = null;
+
+function stopPlacingRobot() {
+    placingRobot = null;
+    btnPlaceRed.disabled = false;
+    btnPlaceGreen.disabled = false;
+    btnPlaceBlue.disabled = false;
+}
+
+btnPlaceRed.addEventListener('click', (event) => {
+    if (placingRobot == 'red') {
+        stopPlacingRobot();
+    } else {
+        placingRobot = 'red';
+        btnPlaceGreen.disabled = true;
+        btnPlaceBlue.disabled = true;
+    }
 }, false);
-$('btn-reset').addEventListener('click', (event) => {
-    var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState !== XMLHttpRequest.DONE) {
-            return;
-        }
-        if (xhr.status === 200) {
-            parseBoardResponse(xhr.responseText);
-        } else {
-            alert('There was a problem with the request.');
-        }
-    };
-    xhr.open('GET', '/reset', true);
-    xhr.send();
+btnPlaceGreen.addEventListener('click', (event) => {
+    if (placingRobot == 'green') {
+        stopPlacingRobot();
+    } else {
+        placingRobot = 'green';
+        btnPlaceRed.disabled = true;
+        btnPlaceBlue.disabled = true;
+    }
+}, false);
+btnPlaceBlue.addEventListener('click', (event) => {
+    if (placingRobot == 'blue') {
+        stopPlacingRobot();
+    } else {
+        placingRobot = 'blue';
+        btnPlaceRed.disabled = true;
+        btnPlaceGreen.disabled = true;
+    }
+}, false);
+
+$('btn-prepare-game').addEventListener('click', (event) => {
+    $xhr('GET', '/prepare_game', (xhr) => {
+        const json = JSON.parse(xhr.responseText);
+        parseBoardResponse(json);
+    });
+    event.target.disabled = true;
 }, false);
 </script>
 {% endblock %}

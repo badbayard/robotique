@@ -19,9 +19,17 @@ class ProxyBot(Bot):
     def pos(self):
         return self.bot.pos
 
+    @pos.setter
+    def pos(self, pos):
+        self.bot.pos = pos
+
     @property
     def dir(self):
         return self.bot.dir
+
+    @dir.setter
+    def dir(self, dir):
+        self.bot.dir = dir
 
     @property
     def color(self):
@@ -38,10 +46,6 @@ class ProxyBot(Bot):
     def forward(self, count: int = 1, *args, **kwargs) -> None:
         self._cmd('forward:' + str(count))
         return self.bot.forward(count, *args, **kwargs)
-
-    def backward(self, count: int = 1, *args, **kwargs) -> None:
-        self._cmd('backward:' + str(count))
-        return self.bot.backward(count, *args, **kwargs)
 
     def turn_left(self, *args, **kwargs):
         self._cmd('turn_left')

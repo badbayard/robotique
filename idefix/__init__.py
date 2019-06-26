@@ -344,10 +344,6 @@ class Bot(ABC):
         ...
 
     @abstractmethod
-    def backward(self, count: int = 1, *args, **kwargs) -> None:
-        ...
-
-    @abstractmethod
     def turn_left(self, *args, **kwargs):
         ...
 
@@ -365,8 +361,8 @@ class RealWorldError(RuntimeError):
 
 
 class FakeBot(Bot):
-    def __init__(self, board: Board):
-        super().__init__()
+    def __init__(self, board: Board, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.board = board
 
     def wall(self, dir: Union[Direction, RelativeDirection]) -> Wall:
@@ -379,16 +375,6 @@ class FakeBot(Bot):
             if self.board[self.pos].wall(self.dir) != Wall.No:
                 raise RealWorldError("Ran into a wall")
             nextpos = self.pos.move(self.dir)
-            if nextpos not in self.board:
-                raise ValueError("Moved too far")
-            self.pos = nextpos
-
-    def backward(self, count: int = 1, *args, **kwargs) -> None:
-        dir = self.dir.apply_relative(RelativeDirection.Back)
-        for _ in range(count):
-            if self.board[self.pos].wall(dir) != Wall.No:
-                raise RealWorldError("Ran into a wall")
-            nextpos = self.pos.move(dir)
             if nextpos not in self.board:
                 raise ValueError("Moved too far")
             self.pos = nextpos
