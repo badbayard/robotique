@@ -58,3 +58,6 @@ class ProxyBot(Bot):
     def write_info(self, board: Board, *args, **kwargs):
         self._cmd('write_info')
         return self.bot.write_info(board, *args, **kwargs)
+
+    def __repr__(self):
+        return "ProxyBot('{}')".format(self.bot.name)

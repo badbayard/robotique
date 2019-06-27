@@ -1,5 +1,5 @@
 from io import StringIO
-from typing import List, Iterator, Optional
+from typing import List, Iterator, Optional, Tuple
 
 from flask import render_template, Markup, jsonify, request
 
@@ -24,9 +24,13 @@ class HTMLTableBoardView:
         Wall.No: 'wl-n'
     }
 
-    def __init__(self, board: Board, bots: List[Bot]):
+    def __init__(self, board: Board, bots: List[Bot],
+                 destination: Optional[Position] = None,
+                 destbot: Optional[Bot] = None):
         self.board = board
         self.bots = bots
+        self.destination = destination
+        self.destbot = destbot
 
     def render(self):
         board = self.board
@@ -56,6 +60,10 @@ class HTMLTableBoardView:
                     bgcolor = cell.data['bgcolor']  # type: List[int]
                     if len(bgcolor) == 3:
                         bgcolor.append(1)
+                if None not in (self.destination, self.destbot):
+                    if x == self.destination.x and y == self.destination.y:
+                        content = '★'
+                        bgcolor = [*self.destbot.color, 1]
                 for bot in self.bots:
                     if x == bot.pos.x and y == bot.pos.y:
                         content = {
@@ -90,6 +98,10 @@ class Context:
         self.blue = None  # type: ProxyBot
         self.bots = None  # type: List[ProxyBot]
         self.disc = None  # type: Iterator
+        self.raw_instructions = []  # type: List[Tuple[Bot, Direction]]
+        self.instructions = []  # type: List
+        self.destination = None  # type: Optional[Position]
+        self.destbot = None  # type: Optional[Bot]
 
     def make_board_discovery(self):
         self.realboard = boardgen.generate_board(8, 8)
@@ -119,22 +131,18 @@ class Context:
         self.green.pos = self._find_empty_cell().pos
         self.blue.pos = self._find_empty_cell().pos
 
+    def translate_instructions(self):
+        pass  # TODO
+
 
 ctx = Context()
 ctx.make_board_discovery()
 
 
-@app.route('/')
-def index():
-    view = HTMLTableBoardView(ctx.board, ctx.bots)
-    viewreal = HTMLTableBoardView(ctx.realboard, ctx.bots)
-    return render_template("index.html", board1=Markup(view.render()))
-
-
 def _render(commands: Optional[List] = None,
             discovery_end: Optional[bool] = None):
-    view = HTMLTableBoardView(ctx.board, ctx.bots)
-    viewreal = HTMLTableBoardView(ctx.realboard, ctx.bots)
+    view = HTMLTableBoardView(ctx.board, ctx.bots, ctx.destination, ctx.destbot)
+    viewreal = HTMLTableBoardView(ctx.realboard, ctx.bots, ctx.destination, ctx.destbot)
     json = {
         'board': view.render(),
         'realboard': viewreal.render()
@@ -144,6 +152,12 @@ def _render(commands: Optional[List] = None,
     if discovery_end is not None:
         json['discovery_end'] = discovery_end
     return jsonify(json)
+
+
+@app.route('/')
+def index():
+    view = HTMLTableBoardView(ctx.board, ctx.bots, ctx.destination, ctx.destbot)
+    return render_template("index.html", board1=Markup(view.render()))
 
 
 @app.route('/step_discovery')
@@ -182,9 +196,12 @@ def prepare_game():
 
 @app.route('/start_game')
 def start_game():
-    rgame = rm.Game(ctx.board, ctx.bots, Position(0, 0), ctx.red)
-    print(rr.search(rgame))
-    return _render()
+    rgame = rm.Game(ctx.board, ctx.bots, ctx.destination, ctx.destbot)
+    ctx.raw_instructions = rr.search(rgame)
+    commands = []
+    for i in ctx.raw_instructions:
+        commands.append({'bot': i[0].name, 'cmd': str(i[1])})
+    return _render(commands=commands)
 
 
 @app.route('/place_bot')
@@ -200,4 +217,14 @@ def place_bot():
         bot.dir = bot.dir.apply_relative(RelativeDirection.Right)
     else:
         bot.pos = newpos
+    return _render()
+
+
+@app.route('/place_dest')
+def place_dest():
+    x = int(request.args.get('x'))
+    y = int(request.args.get('y'))
+    botname = request.args.get('bot')
+    ctx.destbot = [b for b in ctx.bots if b.name == botname][0]
+    ctx.destination = Position(x, y)
     return _render()

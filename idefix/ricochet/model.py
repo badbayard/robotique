@@ -59,6 +59,24 @@ class Game:
         self.destination = destination
         self.destbot = destbot
 
+    def robot_for_letter(self, letter: str) -> Bot:
+        if letter == 'R':
+            return self.bots[0]
+        if letter == 'G':
+            return self.bots[1]
+        if letter == 'B':
+            return self.bots[2]
+        raise KeyError
+
+    @staticmethod
+    def direction_for_letter(letter: str) -> Direction:
+        return {
+            'N': Direction.North,
+            'E': Direction.East,
+            'S': Direction.South,
+            'W': Direction.West
+        }[letter]
+
     def export(self):
         token = idx(self.board, self.destination)
         robots = [idx(self.board, bot.pos) for bot in self.bots]
