@@ -136,7 +136,7 @@ class RealBot(Bot):
                         col_counter.print()
                         if col == DirectionColorMap[self.dir][0]:
                             break
-				self.motor_l.position = tmpPosition - 150
+                self.motor_l.position = tmpPosition - 150
         print('')
         self.motor_l.stop()
         self.motor_r.stop()
