@@ -62,7 +62,11 @@ function parseBoardResponse(json) {
             const line = document.createElement('div');
             line.classList.add('line');
             line.classList.add('b-' + cmdline.bot);
-            line.innerText = cmdline.cmd;
+            if (cmdline.args === undefined) {
+                line.innerText = cmdline.cmd;
+            } else {
+                line.innerText = cmdline.cmd + ' ' + JSON.stringify(cmdline.args);
+            }
             log.appendChild(line);
         }
         log.scrollTop = log.scrollHeight;  // Scroll to bottom
@@ -99,6 +103,7 @@ $('btn-reset').addEventListener('click', (event) => {
     $('btn-auto-discovery').disabled = false;
     $('btn-prepare-game').disabled = false;
     $('btn-start-game').disabled = false;
+    $('btn-step-game').disabled = false;
     const log = $('commandlog');
     const cLog = log.cloneNode(false);
     log.parentNode.replaceChild(cLog, log);
@@ -224,6 +229,16 @@ $('btn-start-game').addEventListener('click', (event) => {
         parseBoardResponse(json);
     });
     event.target.disabled = true;
+}, false);
+$('btn-step-game').addEventListener('click', (event) => {
+    $xhr('GET', '/step_game', (xhr) => {
+        const json = JSON.parse(xhr.responseText);
+        parseBoardResponse(json);
+        if (json.game_end !== true) {
+            $('btn-step-game').disabled = false;
+        }
+    });
+    $('btn-step-game').disabled = true;
 }, false);
 </script>
 {% endblock %}
