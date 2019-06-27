@@ -53,12 +53,12 @@
         "motor_r": "outC"
       },
       "sensor_colors": {
-        "Black": [0, 25],
-        "Wood": [35, 60],
+        "Black": [0, 30],
+        "Wood": [43, 60],
         "Red": [61, 85],
-        "White": [90, 100]
+        "White": [86, 100]
       },
-      "pulses_per_cm": 34.7,
+      "pulses_per_cm": 34.85,
       "pulses_per_90_degrees": 490
     }
   ]
