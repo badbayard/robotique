@@ -12,16 +12,20 @@
     </div>
     <div class="section">
       <h4>Discovery</h4>
-      <button class="pure-button" id="btn-step-discovery">Step</button>
-      <button class="pure-button" id="btn-auto-discovery">Auto</button>
+      <div class="pure-u-1-2 minpad"><button class="pure-button pure-u-1" id="btn-step-discovery">Step</button></div><!--
+      --><div class="pure-u-1-2 minpad"><button class="pure-button pure-u-1" id="btn-auto-discovery">Auto</button></div>
     </div>
     <div class="section">
       <h4>Game setup</h4>
-      <button class="pure-button" id="btn-prepare-game">Prepare</button>
-      | Place
+      <button class="pure-button pure-u-1" id="btn-prepare-game">Prepare</button><br>
+      <div style="width:6em;display:inline-block">Place</div>
       <button class="pure-button" id="btn-place-red">R</button>
       <button class="pure-button" id="btn-place-green">G</button>
-      <button class="pure-button" id="btn-place-blue">B</button>
+      <button class="pure-button" id="btn-place-blue">B</button><br>
+      <div style="width:6em;display:inline-block">Destination</div>
+      <button class="pure-button" id="btn-destination-red">R</button>
+      <button class="pure-button" id="btn-destination-green">G</button>
+      <button class="pure-button" id="btn-destination-blue">B</button>
     </div>
     <div class="section">
       <h4>Game</h4>
@@ -58,7 +62,11 @@ function parseBoardResponse(json) {
             const line = document.createElement('div');
             line.classList.add('line');
             line.classList.add('b-' + cmdline.bot);
-            line.innerText = cmdline.cmd;
+            if (cmdline.args === undefined) {
+                line.innerText = cmdline.cmd;
+            } else {
+                line.innerText = cmdline.cmd + ' ' + JSON.stringify(cmdline.args);
+            }
             log.appendChild(line);
         }
         log.scrollTop = log.scrollHeight;  // Scroll to bottom
@@ -95,6 +103,7 @@ $('btn-reset').addEventListener('click', (event) => {
     $('btn-auto-discovery').disabled = false;
     $('btn-prepare-game').disabled = false;
     $('btn-start-game').disabled = false;
+    $('btn-step-game').disabled = false;
     const log = $('commandlog');
     const cLog = log.cloneNode(false);
     log.parentNode.replaceChild(cLog, log);
@@ -105,23 +114,34 @@ function cellMouseEnter(event) {
     if (placingRobot !== null) {
         cell.classList.add('hover-' + placingRobot);
     }
+    if (placingDest !== null) {
+        cell.classList.add('hover-' + placingDest);
+    }
 }
 function cellMouseLeave(event) {
     const cell = event.target;
     if (placingRobot !== null) {
         cell.classList.remove('hover-' + placingRobot);
     }
+    if (placingDest !== null) {
+        cell.classList.remove('hover-' + placingDest);
+    }
 }
 function cellMouseClick(event) {
-    if (placingRobot === null) {
-        return;
-    }
     const cell = event.target;
     const x = cell.dataset.x, y = cell.dataset.y;
-    $xhr('GET', '/place_bot?x=' + x + '&y=' + y + '&bot=' + placingRobot, (xhr) => {
-        const json = JSON.parse(xhr.responseText);
-        parseBoardResponse(json);
-    });
+    if (placingRobot !== null) {
+        $xhr('GET', '/place_bot?x=' + x + '&y=' + y + '&bot=' + placingRobot, (xhr) => {
+            const json = JSON.parse(xhr.responseText);
+            parseBoardResponse(json);
+        });
+    }
+    if (placingDest !== null) {
+        $xhr('GET', '/place_dest?x=' + x + '&y=' + y + '&bot=' + placingDest, (xhr) => {
+            const json = JSON.parse(xhr.responseText);
+            parseBoardResponse(json);
+        });
+    }
 }
 function setBoardMouseEvents() {
     const cells = $('board-display').querySelectorAll('td');
@@ -137,41 +157,62 @@ setBoardMouseEvents();
 const btnPlaceRed = $('btn-place-red'),
       btnPlaceGreen = $('btn-place-green'),
       btnPlaceBlue = $('btn-place-blue');
-let placingRobot = null;
+const btnDestRed = $('btn-destination-red'),
+      btnDestGreen = $('btn-destination-green'),
+      btnDestBlue = $('btn-destination-blue');
+const colorBtns = [
+    btnPlaceRed, btnPlaceGreen, btnPlaceBlue,
+    btnDestRed, btnDestGreen, btnDestBlue
+];
+let placingRobot = null, placingDest = null;
 
-function stopPlacingRobot() {
-    placingRobot = null;
-    btnPlaceRed.disabled = false;
-    btnPlaceGreen.disabled = false;
-    btnPlaceBlue.disabled = false;
+function placeRobot(color) {
+    if (placingRobot == color) {
+        placingRobot = null;
+        for (let btn of colorBtns) {
+            btn.disabled = false;
+        }
+    } else {
+        placingRobot = color;
+        for (let btn of colorBtns) {
+            btn.disabled = true;
+        }
+        $('btn-place-' + color).disabled = false;
+    }
+}
+function placeDest(color) {
+    if (placingDest == color) {
+        placingDest = null;
+        for (let btn of colorBtns) {
+            btn.disabled = false;
+        }
+    } else {
+        placingDest = color;
+        for (let btn of colorBtns) {
+            btn.disabled = true;
+        }
+        $('btn-destination-' + color).disabled = false;
+    }
 }
 
 btnPlaceRed.addEventListener('click', (event) => {
-    if (placingRobot == 'red') {
-        stopPlacingRobot();
-    } else {
-        placingRobot = 'red';
-        btnPlaceGreen.disabled = true;
-        btnPlaceBlue.disabled = true;
-    }
+    placeRobot('red');
 }, false);
 btnPlaceGreen.addEventListener('click', (event) => {
-    if (placingRobot == 'green') {
-        stopPlacingRobot();
-    } else {
-        placingRobot = 'green';
-        btnPlaceRed.disabled = true;
-        btnPlaceBlue.disabled = true;
-    }
+    placeRobot('green');
 }, false);
 btnPlaceBlue.addEventListener('click', (event) => {
-    if (placingRobot == 'blue') {
-        stopPlacingRobot();
-    } else {
-        placingRobot = 'blue';
-        btnPlaceRed.disabled = true;
-        btnPlaceGreen.disabled = true;
-    }
+    placeRobot('blue');
+}, false);
+
+btnDestRed.addEventListener('click', (event) => {
+    placeDest('red');
+}, false);
+btnDestGreen.addEventListener('click', (event) => {
+    placeDest('green');
+}, false);
+btnDestBlue.addEventListener('click', (event) => {
+    placeDest('blue');
 }, false);
 
 $('btn-prepare-game').addEventListener('click', (event) => {
@@ -188,6 +229,16 @@ $('btn-start-game').addEventListener('click', (event) => {
         parseBoardResponse(json);
     });
     event.target.disabled = true;
+}, false);
+$('btn-step-game').addEventListener('click', (event) => {
+    $xhr('GET', '/step_game', (xhr) => {
+        const json = JSON.parse(xhr.responseText);
+        parseBoardResponse(json);
+        if (json.game_end !== true) {
+            $('btn-step-game').disabled = false;
+        }
+    });
+    $('btn-step-game').disabled = true;
 }, false);
 </script>
 {% endblock %}
