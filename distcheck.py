@@ -25,21 +25,28 @@ units = us.units
 
 def detectionFace():
 	distance = us.value() / 10  # convert mm to cm
-	# print("distance " + str(distance))
-	return distance < DISTANCE_COLLISION_CM
+	print("distance F " + str(distance))
+	#return distance < DISTANCE_COLLISION_CM
 
 def detectionGauche():
 	distanceG = usG.value()  # convert mm to cm
-	# print("distance G" + str(distanceG))
-	return distanceG < DISTANCE_COLLISION_CM
+	print("distance G " + str(distanceG))
+	#return distanceG < DISTANCE_COLLISION_CM
 
 def detectionDroit():
 	distanceD = usD.value()  # convert mm to cm
-	# print("distance D" + str(distanceD))
-	return distanceD < DISTANCE_COLLISION_CM
+	print("distance D " + str(distanceD))
+	#return distanceD < DISTANCE_COLLISION_CM
 
+	'''
 stop=False
 while not stop:
 	stop = detectionGauche() or detectionFace() or detectionDroit()
 
 	couleur = colors[colorSensor.value()]
+	'''
+while True:
+	detectionFace()
+	detectionGauche()
+	detectionDroit()
+	time.sleep(4)

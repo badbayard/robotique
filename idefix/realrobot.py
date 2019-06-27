@@ -56,6 +56,7 @@ class RealBot(Bot):
     ROTATE_PULSES_SLOWDOWN_PER_STAY = 40
     ROTATE_SLOWDOWN_SPEED = 70
     CM_PER_CELL = 30
+    DISTANCE_TO_WALL = 6;
 
     def __init__(self, motor_l: LargeMotor, motor_r: LargeMotor,
                  distance_l: Optional[UltrasonicSensor],
@@ -269,8 +270,20 @@ class RealBot(Bot):
 
         print("Direction: " + str(direction))
 
-    def wall(self, dir: Union[Direction, RelativeDirection]) -> Wall:
-        raise NotImplementedError
+    def wall(self, dist_max: float = DISTANCE_TO_WALL, dir: Union[Direction, RelativeDirection]) -> Wall:
+        if isinstance(dir, Direction):
+            dir = self.dir.get_relative(dir)
+            self.distance_f = self.distance_f.value() / 10
+            if self.distance_f <= dist_max:
+                distance_l.mode = 'US-DIST-CM'
+                distance_r.mode = 'US-DIST-CM'
+                if dir == RelativeDirection.Left:
+                    self.distance_l = self.distance_l.value()
+                if dir == RelativeDirection.Right:
+                    self.distance_r = self.distance_r.value()
+                distance_l.mode = 'US-LISTEN'   #repasse en mode listen pour ne pas interfere
+                distance_r.mode = 'US-LISTEN'
+
 
     def write_info(self, board: Board, *args, **kwargs):
         raise NotImplementedError
@@ -312,11 +325,14 @@ class EV3Bot(RealBot):
         per = robot['peripherals']
         try:
             distance_l = UltrasonicSensor(per['distance_l'])
+            distance_l.mode = 'US-DIST-CM'
         except KeyError:
             distance_l = None
         distance_f = UltrasonicSensor(per['distance_f'])
+        distance_f.mode = 'US-DIST-CM'
         try:
             distance_r = UltrasonicSensor(per['distance_r'])
+            distance_r.mode = 'US-DIST-CM'
         except KeyError:
             distance_r = None
         try:
