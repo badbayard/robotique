@@ -137,8 +137,7 @@ class RealBot(Bot):
                         col_counter.print()
                         if col == DirectionColorMap[self.dir][0]:
                             break
-					self.motor_l.position = tmpPosition - 150
-        print('')
+					self.motor_l.position = tmpPosition - 100
         self.motor_l.stop()
         self.motor_r.stop()
 
@@ -169,12 +168,17 @@ class RealBot(Bot):
             self.ROTATE_PULSES_SLOWDOWN +
             self.ROTATE_PULSES_SLOWDOWN_PER_STAY * self.rotate_stays)
         print("FP: " + str(fast_pulses))
-        self.motor_l.run_to_rel_pos(position_sp=-fast_pulses, speed_sp=-speed)
-        self.motor_r.run_to_rel_pos(position_sp=fast_pulses, speed_sp=speed)
-        self.motor_l.wait_until_not_moving()
-        self.motor_r.wait_until_not_moving()
+        self.motor_l.run_forever(speed_sp=-speed)
+        self.motor_r.run_forever(speed_sp=speed)
+        #self.motor_l.wait_until_not_moving()
+        #self.motor_r.wait_until_not_moving()
 
-        col_counter = ConsecutiveCounter(4)
+        col_counter = ConsecutiveCounter(5)
+        col_brown_counter = ConsecutiveCounter(15)
+        while not col_brown_counter.triggered_by(BoardColor.Wood):
+		    if self.read_color() == BoardColor.Wood : 
+                col_brown_counter(self.read_color())
+
         self.rotate_left(self.ROTATE_SLOWDOWN_SPEED)
         target_dir = self.dir.apply_relative(RelativeDirection.Left)
         target_color = DirectionColorMap[target_dir][1]
@@ -198,12 +202,17 @@ class RealBot(Bot):
             self.ROTATE_PULSES_SLOWDOWN +
             self.ROTATE_PULSES_SLOWDOWN_PER_STAY * self.rotate_stays)
         print("FP: " + str(fast_pulses))
-        self.motor_l.run_to_rel_pos(position_sp=fast_pulses, speed_sp=speed)
-        self.motor_r.run_to_rel_pos(position_sp=-fast_pulses, speed_sp=-speed)
-        self.motor_l.wait_until_not_moving()
-        self.motor_r.wait_until_not_moving()
+        self.motor_l.run_forever(speed_sp=speed)
+        self.motor_r.run_forever(speed_sp=-speed)
+        #self.motor_l.wait_until_not_moving()
+        #self.motor_r.wait_until_not_moving()
 
-        col_counter = ConsecutiveCounter(4)
+        col_counter = ConsecutiveCounter(5)
+        col_brown_counter = ConsecutiveCounter(15)
+        while not col_brown_counter.triggered_by(BoardColor.Wood):
+            if self.read_color() == BoardColor.Wood : 
+			    col_brown_counter(self.read_color())
+
         self.rotate_right(self.ROTATE_SLOWDOWN_SPEED)
         target_dir = self.dir.apply_relative(RelativeDirection.Right)
         target_color = DirectionColorMap[target_dir][0]
