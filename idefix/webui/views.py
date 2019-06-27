@@ -8,6 +8,9 @@ from idefix import Board, FakeBot, Bot, Wall, Direction, Position, boardgen, \
 from idefix.proxy import ProxyBot
 from idefix.webui import app
 
+import idefix.ricochet.model as rm
+import idefix.ricochet.ricochet as rr
+
 
 class HTMLTableBoardView:
     HorizontalWalls = {
@@ -89,8 +92,8 @@ class Context:
         self.disc = None  # type: Iterator
 
     def make_board_discovery(self):
-        self.realboard = boardgen.generate_board(5, 5)
-        self.board = Board(5, 5)
+        self.realboard = boardgen.generate_board(8, 8)
+        self.board = Board(8, 8)
         fakebot = FakeBot(self.realboard)
         fakebot.dir = Direction.East
         fakebot.write_info(self.board)
@@ -174,6 +177,13 @@ def reset():
 @app.route('/prepare_game')
 def prepare_game():
     ctx.prepare_game()
+    return _render()
+
+
+@app.route('/start_game')
+def start_game():
+    rgame = rm.Game(ctx.board, ctx.bots, Position(0, 0), ctx.red)
+    print(rr.search(rgame))
     return _render()
 
 

@@ -1,3 +1,4 @@
+from os.path import *
 from ctypes import *
 
 COLORS = {
@@ -13,7 +14,7 @@ DIRECTIONS = {
     8: 'W',
 }
 
-dll = CDLL('./_ricochet')
+dll = CDLL(join(dirname(abspath(__file__)), '_ricochet'))
 
 
 class Game(Structure):

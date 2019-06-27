@@ -17,12 +17,15 @@
     </div>
     <div class="section">
       <h4>Game setup</h4>
-      <button class="pure-button" id="btn-prepare-game">Prepare</button><br>
-      Place
+      <button class="pure-button" id="btn-prepare-game">Prepare</button>
+      | Place
       <button class="pure-button" id="btn-place-red">R</button>
       <button class="pure-button" id="btn-place-green">G</button>
       <button class="pure-button" id="btn-place-blue">B</button>
-      <br>
+    </div>
+    <div class="section">
+      <h4>Game</h4>
+      <button class="pure-button" id="btn-start-game">Start</button>
       <button class="pure-button" id="btn-step-game">Step</button>
     </div>
   </div>
@@ -90,6 +93,11 @@ $('btn-reset').addEventListener('click', (event) => {
     });
     $('btn-step-discovery').disabled = false;
     $('btn-auto-discovery').disabled = false;
+    $('btn-prepare-game').disabled = false;
+    $('btn-start-game').disabled = false;
+    const log = $('commandlog');
+    const cLog = log.cloneNode(false);
+    log.parentNode.replaceChild(cLog, log);
 }, false);
 
 function cellMouseEnter(event) {
@@ -168,6 +176,14 @@ btnPlaceBlue.addEventListener('click', (event) => {
 
 $('btn-prepare-game').addEventListener('click', (event) => {
     $xhr('GET', '/prepare_game', (xhr) => {
+        const json = JSON.parse(xhr.responseText);
+        parseBoardResponse(json);
+    });
+    event.target.disabled = true;
+}, false);
+
+$('btn-start-game').addEventListener('click', (event) => {
+    $xhr('GET', '/start_game', (xhr) => {
         const json = JSON.parse(xhr.responseText);
         parseBoardResponse(json);
     });
