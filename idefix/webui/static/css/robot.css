@@ -39,6 +39,11 @@ html, body, .main, #boardcontainer, #rightpanel { height: 100vh; }
   margin-top: .2em;
   padding: .2em;
 }
+#rightpanel .minpad {
+  padding: .2em;
+  display: inline-block;
+  box-sizing: border-box;
+}
 #rightpanel .section h4 {
   margin: 0;
   text-align: center;
@@ -47,6 +52,9 @@ html, body, .main, #boardcontainer, #rightpanel { height: 100vh; }
 #btn-place-red { background-color: #F99; }
 #btn-place-green { background-color: #9F9; }
 #btn-place-blue { background-color: #99F; }
+#btn-destination-red { background-color: #FCC; }
+#btn-destination-green { background-color: #CFC; }
+#btn-destination-blue { background-color: #CCF; }
 
 #commandlog {
   background: #111;

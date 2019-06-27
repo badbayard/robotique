@@ -1,3 +1,4 @@
+from os.path import *
 from ctypes import *
 
 COLORS = {
@@ -13,7 +14,7 @@ DIRECTIONS = {
     8: 'W',
 }
 
-dll = CDLL('./_ricochet')
+dll = CDLL(join(dirname(abspath(__file__)), '_ricochet'))
 
 
 class Game(Structure):
@@ -32,6 +33,7 @@ CALLBACK_FUNC = CFUNCTYPE(None, c_uint, c_uint, c_uint, c_uint)
 def search(game, callback=None):
     callback = CALLBACK_FUNC(callback) if callback else None
     data = game.export()
+    ogame = game
     game = Game()
     game.token = data['token']
     game.last = 0
@@ -49,7 +51,8 @@ def search(game, callback=None):
     for value in path.raw[:depth]:
         color = colors[(value >> 4) & 0x0f]
         direction = DIRECTIONS[value & 0x0f]
-        result.append((color, direction))
+        result.append((ogame.robot_for_letter(color),
+                       ogame.direction_for_letter(direction)))
     return result
 
 

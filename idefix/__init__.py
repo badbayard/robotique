@@ -273,6 +273,23 @@ class Board:
         return self.min_x <= pos.x <= self.max_x and \
                self.min_y <= pos.y <= self.max_y
 
+    @property
+    def bounding_box(self) -> Tuple[Position, Position]:
+        minp, maxp = [self.max_x, self.max_y], [self.min_x, self.min_y]
+        for y in range(self.min_y, self.max_y + 1):
+            for x in range(self.min_x, self.max_x + 1):
+                cell = self[Position(x, y)]
+                if cell.explored:
+                    if x < minp[0]:
+                        minp[0] = x
+                    if y < minp[1]:
+                        minp[1] = y
+                    if x > maxp[0]:
+                        maxp[0] = x
+                    if y > maxp[1]:
+                        maxp[1] = y
+        return Position(minp[0], minp[1]), Position(maxp[0], maxp[1])
+
 
 BoardColorCalibration = List[Tuple[Tuple[int, int], 'BoardColor']]
 
