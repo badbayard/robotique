@@ -8,6 +8,7 @@
       "peripherals": {
         "distance_l": "in1",
         "distance_f": "in2",
+        "distance_r": "in4",
         "color_sensor": "in3",
         "motor_l": "outB",
         "motor_r": "outC"

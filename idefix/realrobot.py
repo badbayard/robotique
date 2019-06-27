@@ -284,16 +284,27 @@ class RealBot(Bot):
              dist_max: float = DISTANCE_TO_WALL) -> Wall:
         if isinstance(dir, Direction):
             dir = self.dir.get_relative(dir)
-            self.distance_f = self.distance_f.value() / 10
-            if self.distance_f <= dist_max:
-                self.distance_l.mode = 'US-DIST-CM'
-                self.distance_r.mode = 'US-DIST-CM'
-                if dir == RelativeDirection.Left:
-                    self.distance_l = self.distance_l.value()
-                if dir == RelativeDirection.Right:
-                    self.distance_r = self.distance_r.value()
-                self.distance_l.mode = 'US-LISTEN'
-                self.distance_r.mode = 'US-LISTEN'
+        if dir == RelativeDirection.Front:
+            '''self.distance_l.mode = 'US-LISTEN'
+            self.distance_f.mode = 'US-DIST-CM'
+            self.distance_r.mode = 'US-LISTEN'''
+            return Wall.Yes if (self.distance_f.value() / 10) \
+                               < dist_max else Wall.No
+        elif dir == RelativeDirection.Left:
+            if self.distance_l is None:
+                return Wall.Unknown
+            '''self.distance_l.mode = 'US-DIST-CM'
+            self.distance_f.mode = 'US-LISTEN'
+            self.distance_r.mode = 'US-LISTEN'''
+            return Wall.Yes if self.distance_l.value() < 10 else Wall.No
+        elif dir == RelativeDirection.Right:
+            if self.distance_r is None:
+                return Wall.Unknown
+            '''self.distance_l.mode = 'US-LISTEN'
+            self.distance_f.mode = 'US-LISTEN'
+            self.distance_r.mode = 'US-DIST-CM'''
+            return Wall.Yes if self.distance_r.value() < 10 else Wall.No
+        return Wall.Unknown
 
     def write_info(self, board: Board, *args, **kwargs):
         raise NotImplementedError

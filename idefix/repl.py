@@ -6,7 +6,7 @@ import platform
 import sys
 import readline  # Historique sur le input()
 
-from idefix import Board, Direction, Bot
+from idefix import Board, Direction, Bot, RelativeDirection
 
 
 class REPLContext:
@@ -92,6 +92,25 @@ class RightCommand(REPLCommand):
             ctx.bot.turn_right(pulses=int(args[0]))
         except IndexError:
             ctx.bot.turn_right()
+
+
+@command
+class WallCommand(REPLCommand):
+    NAME = 'wall'
+    SHORTHAND = 'w'
+
+    def __call__(self, ctx: REPLContext, *args, **kwargs):
+        namemap = {
+            'n': Direction.North,
+            'e': Direction.East,
+            's': Direction.South,
+            'w': Direction.West,
+            'f': RelativeDirection.Front,
+            'r': RelativeDirection.Right,
+            'b': RelativeDirection.Back,
+            'l': RelativeDirection.Left
+        }
+        print(ctx.bot.wall(namemap[args[0]]))
 
 
 @command

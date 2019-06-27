@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import Optional, List, Union
 import traceback
 import platform
 import readline  # Historique sur le input()
 from socket import *
 import sys
-from idefix import Board, Direction
+from idefix import Board, Direction, RelativeDirection
 from idefix.realrobot import RealBot, EV3Bot, get_robot_calibration
 
 
@@ -18,9 +18,13 @@ class CmdServContext:
         self.bot = bot
         self.conn = conn
 
-    def send(self, data: bytes):
-        print('< ' + data.decode('utf-8'))
-        self.conn.send(data)
+    def send(self, data: Union[bytes, str]):
+        if isinstance(data, str):
+            print('< ' + data)
+            self.conn.send(data.encode('utf-8'))
+        else:
+            print('< ' + data.decode('utf-8'))
+            self.conn.send(data)
 
 
 class CmdServCommand(ABC):
@@ -105,17 +109,18 @@ class WallCommand(CmdServCommand):
     NAME = 'wall'
     SHORTHAND = b'w'
 
-    def __call__(self, ctx:CmdServContext, *args, **kwargs):
-        try:
-            namemap = {
-                b'n': Direction.North,
-                b'e': Direction.East,
-                b's': Direction.South,
-                b'w': Direction.West
-            }
-            ctx.bot.wall(namemap[args[0]])
-        except IndexError:
-            ctx.bot.wall()
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
+        dirmap = {
+            b'n': Direction.North,
+            b'e': Direction.East,
+            b's': Direction.South,
+            b'w': Direction.West,
+            b'f': RelativeDirection.Front,
+            b'r': RelativeDirection.Right,
+            b'b': RelativeDirection.Back,
+            b'l': RelativeDirection.Left
+        }
+        ctx.send(ctx.bot.wall(dirmap[args[0]]).value)
 
 
 @command
@@ -192,11 +197,7 @@ def repl_cmd(ctx: CmdServContext, cmd: bytes, args: Optional[List] = None):
 
 def repl(ctx: CmdServContext):
     while True:
-        try:
-            cmd_raw = ctx.conn.recv(1024)
-        except (EOFError, KeyboardInterrupt):
-            print("quit")
-            break
+        cmd_raw = ctx.conn.recv(1024)
         print('< ' + cmd_raw.decode('utf-8'))
         cmd_raw = cmd_raw.split(b' ')
         cmd = cmd_raw[0]
@@ -222,7 +223,12 @@ if __name__ == '__main__':
     s.listen(1)
 
     while True:
-        connection, address = s.accept()  # connection is a new socket
-        repl(CmdServContext(b, bot, connection))
+        try:
+            connection, address = s.accept()  # connection is a new socket
+            connection.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
+            repl(CmdServContext(b, bot, connection))
+        except BrokenPipeError:
+            print("Broken pipe!")
+            pass
 
     bot.stop()

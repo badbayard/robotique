@@ -6,6 +6,17 @@ from socket import *
 
 
 class RemoteBot(Bot):
+    DIRNAMEMAP = {
+        Direction.North: b'n',
+        Direction.East: b'e',
+        Direction.South: b's',
+        Direction.West: b'w',
+        RelativeDirection.Front: b'f',
+        RelativeDirection.Right: b'r',
+        RelativeDirection.Back: b'b',
+        RelativeDirection.Left: b'l'
+    }
+
     def __init__(self, hostname: str):
         conf = robot_json_entry(hostname)
         super().__init__(name=hostname, color=conf['color'],
@@ -13,6 +24,7 @@ class RemoteBot(Bot):
         serverPort = 2000                   # use arbitrary port > 1024
         self.s = socket(AF_INET, SOCK_STREAM)    # create a TCP socket
         self.s.connect((conf['ip'], serverPort)) # connect to server on the port
+        self.s.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
         self._dir = None
 
     @property
@@ -32,28 +44,22 @@ class RemoteBot(Bot):
 
     @dir.setter
     def dir(self, d: Direction):
-        dirmap = {
-            Direction.North: b'n',
-            Direction.East: b'e',
-            Direction.South: b's',
-            Direction.West: b'w'
-        }
-        self.s.send(b'd ' + dirmap[d])
+        self.s.send(b'd ' + self.DIRNAMEMAP[d])
         assert self.s.recv(2) == b'OK'
         self._dir = d
 
     def wall(self, dir: Union[Direction, RelativeDirection]) -> Wall:
-        if isinstance(dir, Direction):
-            dir = self.dir.get_relative(dir)
-        self.s.send(b'w '+dir.encode('utf-8'))
-        raise NotImplementedError('wall')
+        self.s.send(b'w ' + self.DIRNAMEMAP[dir])
+        wall = Wall(self.s.recv(1).decode('ascii'))
+        assert self.s.recv(2) == b'OK'
+        return wall
 
-    def stop(self, *args):
+    def stop(self):
         self.s.send(b'stop')
         assert self.s.recv(2) == b'OK'
                
     def forward(self, count: int = 1, *args, **kwargs) -> None:
-        self.s.send(b'f')
+        self.s.send(b'f ' + bytes(str(count), 'ascii'))
         assert self.s.recv(2) == b'OK'
 
     def turn_left(self, *args, **kwargs):
