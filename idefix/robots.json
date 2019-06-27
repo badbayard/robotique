@@ -26,13 +26,19 @@
       "color": [0, 255, 0],
       "match_hostname": "green",
       "ip": "192.168.1.97",
+      "peripherals": {
+        "distance_f": "in1",
+        "color_sensor": "in4",
+        "motor_l": "outB",
+        "motor_r": "outC"
+      },
       "sensor_colors": {
         "Black": [0, 25],
         "Wood": [30, 48],
         "Red": [49, 70],
         "White": [75, 100]
       },
-      "pulses_per_cm": 35.2,
+      "pulses_per_cm": 34.85,
       "pulses_per_90_degrees": 490
     },
     {
@@ -40,13 +46,19 @@
       "color": [0, 0, 255],
       "match_hostname": "blue",
       "ip": "192.168.1.135",
+      "peripherals": {
+        "distance_f": "in1",
+        "color_sensor": "in4",
+        "motor_l": "outB",
+        "motor_r": "outC"
+      },
       "sensor_colors": {
         "Black": [0, 25],
         "Wood": [35, 60],
         "Red": [61, 85],
         "White": [86, 100]
       },
-      "pulses_per_cm": 35.2,
+      "pulses_per_cm": 34.7,
       "pulses_per_90_degrees": 490
     }
   ]

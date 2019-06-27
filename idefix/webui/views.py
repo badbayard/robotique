@@ -1,12 +1,15 @@
 from io import StringIO
-from typing import List, Iterator
+from typing import List, Iterator, Optional
 
-from flask import render_template, Markup, jsonify
+from flask import render_template, Markup, jsonify, request
 
 from idefix import Board, FakeBot, Bot, Wall, Direction, Position, boardgen, \
-    astar, RelativeDirection
+    RelativeDirection, discovery
 from idefix.proxy import ProxyBot
 from idefix.webui import app
+
+import idefix.ricochet.model as rm
+import idefix.ricochet.ricochet as rr
 
 
 class HTMLTableBoardView:
@@ -70,7 +73,7 @@ class HTMLTableBoardView:
                     out.write('background-color:rgba({},{},{},{})'.format(
                         *bgcolor))
                 # out.write(';'.join(styles))
-                out.write('">')
+                out.write('" data-x="{}" data-y="{}">'.format(x, y))
                 out.write(content)
                 out.write('</td>')
             out.write('</tr>')
@@ -78,118 +81,123 @@ class HTMLTableBoardView:
         return out.getvalue()
 
 
-# TODO: virer tout ça
-board = None  # type: Board
-discoveryboard = None  # type: Board
-bot = None  # type: ProxyBot
-discovery = None  # type: Iterator
+class Context:
+    def __init__(self):
+        self.realboard = None  # type: Board
+        self.board = None  # type: Board
+        self.red = None  # type: ProxyBot
+        self.green = None  # type: ProxyBot
+        self.blue = None  # type: ProxyBot
+        self.bots = None  # type: List[ProxyBot]
+        self.disc = None  # type: Iterator
 
+    def make_board_discovery(self):
+        self.realboard = boardgen.generate_board(8, 8)
+        self.board = Board(8, 8)
+        fakebot = FakeBot(self.realboard)
+        fakebot.dir = Direction.East
+        fakebot.write_info(self.board)
+        self.red = ProxyBot(fakebot)
+        self.bots = [self.red]
+        self.disc = discovery.run(self.board, self.red)
 
-def run_discovery():
-    # On tourne pour savoir l'état des 4 murs autour du robot
-    def mark_candidates(candidates):
-        for cell in candidates:
-            if Wall.No in (
-                    cell.wall(Direction.North), cell.wall(Direction.East),
-                    cell.wall(Direction.South), cell.wall(Direction.West)):
-                cell.data['bgcolor'] = [255, 255, 128]
-
-    def get_candidates() -> List[Board.Cell]:
-        ret = []
-        for y in range(discoveryboard.min_y, discoveryboard.max_y + 1):
-            for x in range(discoveryboard.min_x, discoveryboard.max_x + 1):
-                cell = discoveryboard[Position(x, y)]
-                if cell.explored:
+    def _find_empty_cell(self):
+        for y in range(self.board.min_y, self.board.max_y + 1):
+            for x in range(self.board.min_x, self.board.max_x + 1):
+                pos = Position(x, y)
+                cell = self.board[pos]
+                if cell.explored or any([bot.pos == pos for bot in self.bots]):
                     continue
-                if Wall.No in (
-                        cell.wall(Direction.North), cell.wall(Direction.East),
-                        cell.wall(Direction.South), cell.wall(Direction.West)):
-                    ret.append(cell)
-        return ret
-    bot.write_info(discoveryboard)
-    mark_candidates(get_candidates())
-    yield []
-    bot.turn_left()
-    bot.write_info(discoveryboard)
-    mark_candidates(get_candidates())
-    yield bot.command_list
-    bot.clear_command_list()
-    while True:
-        candidates = get_candidates()
-        if len(candidates) == 0:
-            break
-        candidates_paths = [*map(
-            lambda d: astar.path(discoveryboard, bot.pos, d.pos), candidates)]
-        shortest_idx = min(enumerate(candidates_paths),
-                           key=lambda x: len(x[1]))[0]
+                return cell
 
-        path = candidates_paths[shortest_idx]
-        nextpos = path[1]  # type: Position
-        nextdir = None
-        for d in (Direction.North, Direction.East,
-                  Direction.South, Direction.West):
-            if nextpos == bot.pos.move(d):
-                nextdir = d
-        reldir = bot.dir.get_relative(nextdir)
-        if reldir == RelativeDirection.Front:
-            bot.forward()
-        elif reldir == RelativeDirection.Right:
-            bot.turn_right()
-        elif reldir == RelativeDirection.Back:
-            bot.turn_right()
-            bot.turn_right()
-        elif reldir == RelativeDirection.Left:
-            bot.turn_left()
-        mark_candidates(candidates)
-        candidates[shortest_idx].data['bgcolor'] = [255, 255, 0]
-        bot.write_info(discoveryboard)
-        discoveryboard[bot.pos].data.pop('bgcolor', None)
-
-        yield bot.command_list
-        bot.clear_command_list()
+    def prepare_game(self):
+        self.green = ProxyBot(FakeBot(
+            self.board, name='green', color=[0, 255, 0]))
+        self.blue = ProxyBot(FakeBot(
+            self.board, name='blue', color=[0, 0, 255]))
+        self.bots = [self.red, self.green, self.blue]
+        self.green.pos = self._find_empty_cell().pos
+        self.blue.pos = self._find_empty_cell().pos
 
 
-def mkboard():
-    global board, discoveryboard, bot, discovery
-    board = boardgen.generate_board(5, 5)
-    discoveryboard = Board(5, 5)
-    fakebot = FakeBot(board)
-    fakebot.dir = Direction.East
-    fakebot.write_info(discoveryboard)
-    bot = ProxyBot(fakebot)
-    discovery = run_discovery()
-mkboard()
+ctx = Context()
+ctx.make_board_discovery()
 
 
 @app.route('/')
 def index():
-    view = HTMLTableBoardView(discoveryboard, [bot])
-    viewreal = HTMLTableBoardView(board, [bot])
-    return render_template("index.html", board1=Markup(view.render() + viewreal.render()))
+    view = HTMLTableBoardView(ctx.board, ctx.bots)
+    viewreal = HTMLTableBoardView(ctx.realboard, ctx.bots)
+    return render_template("index.html", board1=Markup(view.render()))
 
 
-@app.route('/step')
-def step():
-    commands = next(discovery)
-    view = HTMLTableBoardView(discoveryboard, [bot])
-    viewreal = HTMLTableBoardView(board, [bot])
-    return jsonify({
-        'board': view.render()+viewreal.render(),
-        'commands': commands
-    })
+def _render(commands: Optional[List] = None,
+            discovery_end: Optional[bool] = None):
+    view = HTMLTableBoardView(ctx.board, ctx.bots)
+    viewreal = HTMLTableBoardView(ctx.realboard, ctx.bots)
+    json = {
+        'board': view.render(),
+        'realboard': viewreal.render()
+    }
+    if commands is not None:
+        json['commands'] = commands
+    if discovery_end is not None:
+        json['discovery_end'] = discovery_end
+    return jsonify(json)
+
+
+@app.route('/step_discovery')
+def step_discovery():
+    try:
+        commands = next(ctx.disc)
+    except StopIteration:
+        commands = None
+    return _render(commands=commands, discovery_end=commands is None)
+
+
+@app.route('/auto_discovery')
+def auto_discovery():
+    commands = []
+    try:
+        while True:
+            commands.extend(next(ctx.disc))
+    except StopIteration:
+        pass
+    return _render(commands=commands)
 
 
 @app.route('/reset')
 def reset():
-    mkboard()
-    view = HTMLTableBoardView(discoveryboard, [bot])
-    viewreal = HTMLTableBoardView(board, [bot])
-    return jsonify({
-        'board': view.render()+viewreal.render(),
-        'commands': []
-    })
+    global ctx
+    ctx = Context()
+    ctx.make_board_discovery()
+    return _render()
 
 
-@app.route('/about')
-def about():
-    return render_template("about.html")
+@app.route('/prepare_game')
+def prepare_game():
+    ctx.prepare_game()
+    return _render()
+
+
+@app.route('/start_game')
+def start_game():
+    rgame = rm.Game(ctx.board, ctx.bots, Position(0, 0), ctx.red)
+    print(rr.search(rgame))
+    return _render()
+
+
+@app.route('/place_bot')
+def place_bot():
+    x = int(request.args.get('x'))
+    y = int(request.args.get('y'))
+    botname = request.args.get('bot')
+    bot = [b for b in ctx.bots if b.name == botname][0]
+    newpos = Position(x, y)
+    if bot.dir == Direction.Unknown:
+        bot.dir = Direction.North
+    if bot.pos == newpos:
+        bot.dir = bot.dir.apply_relative(RelativeDirection.Right)
+    else:
+        bot.pos = newpos
+    return _render()

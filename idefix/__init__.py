@@ -66,6 +66,13 @@ class Position:
         }.get(dir)
         return Position(self._x + delta[0], self._y + delta[1])
 
+    def get_direction_to(self, pos: 'Position') -> 'Direction':
+        return {
+            (0, -1): Direction.North,
+            (1, 0): Direction.East,
+            (0, 1): Direction.South,
+            (-1, 0): Direction.West
+        }[(pos._x - self._x, pos._y - self._y)]
 
 @enum.unique
 class RelativeDirection(enum.Enum):
@@ -266,6 +273,23 @@ class Board:
         return self.min_x <= pos.x <= self.max_x and \
                self.min_y <= pos.y <= self.max_y
 
+    @property
+    def bounding_box(self) -> Tuple[Position, Position]:
+        minp, maxp = [self.max_x, self.max_y], [self.min_x, self.min_y]
+        for y in range(self.min_y, self.max_y + 1):
+            for x in range(self.min_x, self.max_x + 1):
+                cell = self[Position(x, y)]
+                if cell.explored:
+                    if x < minp[0]:
+                        minp[0] = x
+                    if y < minp[1]:
+                        minp[1] = y
+                    if x > maxp[0]:
+                        maxp[0] = x
+                    if y > maxp[1]:
+                        maxp[1] = y
+        return Position(minp[0], minp[1]), Position(maxp[0], maxp[1])
+
 
 BoardColorCalibration = List[Tuple[Tuple[int, int], 'BoardColor']]
 
@@ -337,10 +361,6 @@ class Bot(ABC):
         ...
 
     @abstractmethod
-    def backward(self, count: int = 1, *args, **kwargs) -> None:
-        ...
-
-    @abstractmethod
     def turn_left(self, *args, **kwargs):
         ...
 
@@ -358,8 +378,8 @@ class RealWorldError(RuntimeError):
 
 
 class FakeBot(Bot):
-    def __init__(self, board: Board):
-        super().__init__()
+    def __init__(self, board: Board, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.board = board
 
     def wall(self, dir: Union[Direction, RelativeDirection]) -> Wall:
@@ -372,16 +392,6 @@ class FakeBot(Bot):
             if self.board[self.pos].wall(self.dir) != Wall.No:
                 raise RealWorldError("Ran into a wall")
             nextpos = self.pos.move(self.dir)
-            if nextpos not in self.board:
-                raise ValueError("Moved too far")
-            self.pos = nextpos
-
-    def backward(self, count: int = 1, *args, **kwargs) -> None:
-        dir = self.dir.apply_relative(RelativeDirection.Back)
-        for _ in range(count):
-            if self.board[self.pos].wall(dir) != Wall.No:
-                raise RealWorldError("Ran into a wall")
-            nextpos = self.pos.move(dir)
             if nextpos not in self.board:
                 raise ValueError("Moved too far")
             self.pos = nextpos
