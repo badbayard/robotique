@@ -117,7 +117,7 @@ class RealBot(Bot):
                     BoardColor.Wood):
                 self.motor_l.stop()
                 self.motor_r.stop()
-
+                tmpPosition = self.motor_l.position
                 if correct_dir == RelativeDirection.Left:
                     self.motor_l.run_forever(speed_sp=-self.CORRECT_SPEED)
                     self.motor_r.run_forever(speed_sp=self.CORRECT_SPEED)
@@ -136,6 +136,7 @@ class RealBot(Bot):
                         col_counter.print()
                         if col == DirectionColorMap[self.dir][0]:
                             break
+				self.motor_l.position = tmpPosition - 150
         print('')
         self.motor_l.stop()
         self.motor_r.stop()
