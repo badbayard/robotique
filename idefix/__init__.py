@@ -329,10 +329,11 @@ ColorDirectionMap = {
 
 class Bot(ABC):
     def __init__(self, name: str = "red", color: Optional[List[int]] = None,
-                 skip_init: bool = False):
+                 skip_init: bool = False, skip_dir_init: bool = False):
         if not skip_init:
             self.pos = Position(0, 0)
-            self.dir = Direction.Unknown
+            if not skip_dir_init:
+                self.dir = Direction.Unknown
             self.color = color or [255, 0, 0]
             self.name = name
 

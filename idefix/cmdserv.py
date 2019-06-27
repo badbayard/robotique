@@ -10,15 +10,20 @@ from idefix import Board, Direction
 from idefix.realrobot import RealBot, EV3Bot, get_robot_calibration
 
 
-class REPLContext:
-    __slots__ = ['board', 'bot']
+class CmdServContext:
+    __slots__ = ['board', 'bot', 'conn']
 
-    def __init__(self, board: Board, bot: RealBot):
+    def __init__(self, board: Board, bot: RealBot, conn: socket):
         self.board = board
         self.bot = bot
+        self.conn = conn
+
+    def send(self, data: bytes):
+        print('< ' + data.decode('utf-8'))
+        self.conn.send(data)
 
 
-class REPLCommand(ABC):
+class CmdServCommand(ABC):
     def __init__(self, name: Optional[str] = None,
                  shorthand: Optional[str] = None, doc: Optional[str] = None):
         self.name = name or getattr(self, 'NAME')
@@ -26,36 +31,36 @@ class REPLCommand(ABC):
         self.doc = doc or getattr(self, 'DOC', '')
 
     @abstractmethod
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
         ...
 
 
-REPLCommandList = []  # type: List[REPLCommand]
+CmdServCommandList = []  # type: List[CmdServCommand]
 
 
 def command(clazz):
-    REPLCommandList.append(clazz())
+    CmdServCommandList.append(clazz())
     return clazz
 
 
 @command
-class HelpCommand(REPLCommand):
+class HelpCommand(CmdServCommand):
     NAME = 'help'
     SHORTHAND = b'?'
     DOC = "Show this help"
 
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
-        for cmdclass in REPLCommandList:
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
+        for cmdclass in CmdServCommandList:
             print("{} - {}: {}".format(
                 cmdclass.shorthand, cmdclass.name, cmdclass.doc))
 
 
 @command
-class ForwardCommand(REPLCommand):
+class ForwardCommand(CmdServCommand):
     NAME = 'forward'
     SHORTHAND = b'f'
 
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
         if len(args) == 1:
             ctx.bot.forward(int(args[0]))
         else:
@@ -63,20 +68,20 @@ class ForwardCommand(REPLCommand):
 
 
 @command
-class BackwardCommand(REPLCommand):
+class BackwardCommand(CmdServCommand):
     NAME = 'backward'
     SHORTHAND = b'b'
 
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
         ctx.bot.backward()
 
 
 @command
-class LeftCommand(REPLCommand):
+class LeftCommand(CmdServCommand):
     NAME = 'left'
     SHORTHAND = b'l'
 
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
         try:
             ctx.bot.turn_left(pulses=int(args[0]))
         except IndexError:
@@ -84,72 +89,79 @@ class LeftCommand(REPLCommand):
 
 
 @command
-class RightCommand(REPLCommand):
+class RightCommand(CmdServCommand):
     NAME = 'right'
     SHORTHAND = b'r'
 
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
         try:
             ctx.bot.turn_right(pulses=int(args[0]))
         except IndexError:
             ctx.bot.turn_right()
 
+
 @command
-class WallCommand(REPLCommand):
+class WallCommand(CmdServCommand):
     NAME = 'wall'
     SHORTHAND = b'w'
-    def __call__(self,ctx:REPLContext, *args, **kwargs):
+
+    def __call__(self, ctx:CmdServContext, *args, **kwargs):
         try:
             namemap = {
                 b'n': Direction.North,
                 b'e': Direction.East,
                 b's': Direction.South,
-                b'w': Direction.West,
-                b'o': Direction.West
+                b'w': Direction.West
             }
             ctx.bot.wall(namemap[args[0]])
         except IndexError:
             ctx.bot.wall()
-           
+
+
 @command
-class StopCommand(REPLCommand):
+class StopCommand(CmdServCommand):
     NAME = 'stop'
     SHORTHAND = b'stop'
 
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
         ctx.bot.stop()
 
 
 @command
-class DirectionCommand(REPLCommand):
+class DirectionCommand(CmdServCommand):
     NAME = 'direction'
     SHORTHAND = b'd'
-    DOC = "Set or get direction"
 
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
         try:
             namemap = {
                 b'n': Direction.North,
                 b'e': Direction.East,
                 b's': Direction.South,
                 b'w': Direction.West,
-                b'o': Direction.West
+                b'?': Direction.Unknown
             }
             olddir = ctx.bot.dir
             ctx.bot.dir = namemap[args[0]]
             print("{} -> {}".format(olddir, ctx.bot.dir))
         except IndexError:
             print(ctx.bot.dir)
-
+            dirmap = {
+                Direction.North: b'n',
+                Direction.East: b'e',
+                Direction.South: b's',
+                Direction.West: b'w',
+                Direction.Unknown: b'?'
+            }
+            ctx.send(dirmap[ctx.bot.dir])
 
 
 @command
-class SequenceCommand(REPLCommand):
+class SequenceCommand(CmdServCommand):
     NAME = 'sequence'
     SHORTHAND = b'seq'
-    DOC = "Run no-args commands sequentially"
 
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
         seq = str(args[0])
         print(ctx.bot.dir)
         for instr in seq:
@@ -157,12 +169,11 @@ class SequenceCommand(REPLCommand):
 
 
 @command
-class SpeedCommand(REPLCommand):
+class SpeedCommand(CmdServCommand):
     NAME = 'speed'
     SHORTHAND = b's'
-    DOC = "Get or set robot speeds"
 
-    def __call__(self, ctx: REPLContext, *args, **kwargs):
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
         if len(args) >= 2:
             ctx.bot.DEFAULT_SPEED = float(args[0])
             ctx.bot.DEFAULT_ROTATE_SPEED = float(args[1])
@@ -170,37 +181,23 @@ class SpeedCommand(REPLCommand):
             ctx.bot.DEFAULT_SPEED, ctx.bot.DEFAULT_ROTATE_SPEED))
 
 
-def repl_cmd(ctx: REPLContext, cmd: str, args: Optional[List] = None):
+def repl_cmd(ctx: CmdServContext, cmd: bytes, args: Optional[List] = None):
     try:
-        cmdinst = [c for c in REPLCommandList if c.shorthand == cmd][0]
+        cmdinst = [c for c in CmdServCommandList if c.shorthand == cmd][0]
     except IndexError:
         print("Unknown command '{}'".format(cmd))
         return
     cmdinst(ctx, *args if args is not None else [])
 
 
-def repl(ctx: REPLContext):
-    hostname = platform.node()
-    myPort = 2000
-    prompt = "R!" + hostname + "> "
-    #del hostname
-    print("Use '?' to get help")
-    print (hostname)
-    print (myPort)
-    hostname ='192.168.1.96'
-    print (hostname)
-    s = socket(AF_INET, SOCK_STREAM)
-    s.bind((hostname, myPort))
-    s.listen(1)
+def repl(ctx: CmdServContext):
     while True:
-        connection, address = s.accept() # connection is a new socket
         try:
-            cmd_raw = connection.recv(1024)
+            cmd_raw = ctx.conn.recv(1024)
         except (EOFError, KeyboardInterrupt):
             print("quit")
             break
-        print (hostname)
-        print (myPort)
+        print('< ' + cmd_raw.decode('utf-8'))
         cmd_raw = cmd_raw.split(b' ')
         cmd = cmd_raw[0]
         args = cmd_raw[1:]
@@ -209,11 +206,23 @@ def repl(ctx: REPLContext):
             repl_cmd(ctx, cmd, args)
         except BaseException as e:
             print(traceback.format_exc())
-        connection.send(b'OK')
+        ctx.send(b'OK')
+
 
 if __name__ == '__main__':
     b = Board(8, 8)
     bot = EV3Bot(platform.node(), board=b)
 
-    repl(REPLContext(b, bot))
+    hostname = platform.node()
+    myPort = 2000
+    print(hostname, myPort)
+    s = socket(AF_INET, SOCK_STREAM)
+    s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+    s.bind(('0.0.0.0', myPort))
+    s.listen(1)
+
+    while True:
+        connection, address = s.accept()  # connection is a new socket
+        repl(CmdServContext(b, bot, connection))
+
     bot.stop()

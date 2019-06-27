@@ -3,16 +3,16 @@ from abc import ABC, abstractmethod
 from typing import Optional, List
 import traceback
 import platform
+import sys
 import readline  # Historique sur le input()
 
-from idefix import Board, Direction
-from idefix.realrobot import RealBot, EV3Bot, get_robot_calibration
+from idefix import Board, Direction, Bot
 
 
 class REPLContext:
     __slots__ = ['board', 'bot']
 
-    def __init__(self, board: Board, bot: RealBot):
+    def __init__(self, board: Board, bot: Bot):
         self.board = board
         self.bot = bot
 
@@ -161,10 +161,8 @@ def repl_cmd(ctx: REPLContext, cmd: str, args: Optional[List] = None):
     cmdinst(ctx, *args if args is not None else [])
 
 
-def repl(ctx: REPLContext):
-    hostname = platform.node()
-    prompt = "R!" + hostname + "> "
-    del hostname
+def repl(ctx: REPLContext, display_hostname: str):
+    prompt = "R!" + display_hostname + "> "
     print("Use '?' to get help")
     while True:
         try:
@@ -184,7 +182,14 @@ def repl(ctx: REPLContext):
 
 if __name__ == '__main__':
     b = Board(8, 8)
-    bot = EV3Bot(platform.node(), board=b)
-
-    repl(REPLContext(b, bot))
+    if len(sys.argv) > 1:
+        from idefix.remote import RemoteBot
+        hostname = sys.argv[1]
+        bot = RemoteBot(hostname)
+        display_hostname = "@" + hostname
+    else:
+        from idefix.realrobot import EV3Bot
+        bot = EV3Bot(platform.node(), board=b)
+        display_hostname = platform.node()
+    repl(REPLContext(b, bot), display_hostname)
     bot.stop()

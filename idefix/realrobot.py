@@ -56,7 +56,7 @@ class RealBot(Bot):
     ROTATE_PULSES_SLOWDOWN_PER_STAY = 40
     ROTATE_SLOWDOWN_SPEED = 70
     CM_PER_CELL = 30
-    DISTANCE_TO_WALL = 6;
+    DISTANCE_TO_WALL = 6
 
     def __init__(self, motor_l: LargeMotor, motor_r: LargeMotor,
                  distance_l: Optional[UltrasonicSensor],
@@ -280,20 +280,20 @@ class RealBot(Bot):
 
         print("Direction: " + str(direction))
 
-    def wall(self, dist_max: float = DISTANCE_TO_WALL, dir: Union[Direction, RelativeDirection]) -> Wall:
+    def wall(self, dir: Union[Direction, RelativeDirection],
+             dist_max: float = DISTANCE_TO_WALL) -> Wall:
         if isinstance(dir, Direction):
             dir = self.dir.get_relative(dir)
             self.distance_f = self.distance_f.value() / 10
             if self.distance_f <= dist_max:
-                distance_l.mode = 'US-DIST-CM'
-                distance_r.mode = 'US-DIST-CM'
+                self.distance_l.mode = 'US-DIST-CM'
+                self.distance_r.mode = 'US-DIST-CM'
                 if dir == RelativeDirection.Left:
                     self.distance_l = self.distance_l.value()
                 if dir == RelativeDirection.Right:
                     self.distance_r = self.distance_r.value()
-                distance_l.mode = 'US-LISTEN'   #repasse en mode listen pour ne pas interfere
-                distance_r.mode = 'US-LISTEN'
-
+                self.distance_l.mode = 'US-LISTEN'
+                self.distance_r.mode = 'US-LISTEN'
 
     def write_info(self, board: Board, *args, **kwargs):
         raise NotImplementedError
