@@ -137,7 +137,7 @@ class RealBot(Bot):
                         col_counter.print()
                         if col == DirectionColorMap[self.dir][0]:
                             break
-					self.motor_l.position = tmpPosition - 100
+                self.motor_l.position = tmpPosition - 100
         self.motor_l.stop()
         self.motor_r.stop()
 
@@ -176,7 +176,7 @@ class RealBot(Bot):
         col_counter = ConsecutiveCounter(5)
         col_brown_counter = ConsecutiveCounter(15)
         while not col_brown_counter.triggered_by(BoardColor.Wood):
-		    if self.read_color() == BoardColor.Wood : 
+            if self.read_color() == BoardColor.Wood : 
                 col_brown_counter(self.read_color())
 
         self.rotate_left(self.ROTATE_SLOWDOWN_SPEED)
@@ -211,7 +211,7 @@ class RealBot(Bot):
         col_brown_counter = ConsecutiveCounter(15)
         while not col_brown_counter.triggered_by(BoardColor.Wood):
             if self.read_color() == BoardColor.Wood : 
-			    col_brown_counter(self.read_color())
+                col_brown_counter(self.read_color())
 
         self.rotate_right(self.ROTATE_SLOWDOWN_SPEED)
         target_dir = self.dir.apply_relative(RelativeDirection.Right)
