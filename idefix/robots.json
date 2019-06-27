@@ -1,4 +1,4 @@
-{
+ {
   "robots": [
     {
       "name": "red",
@@ -27,10 +27,10 @@
       "match_hostname": "green",
       "ip": "192.168.1.97",
       "sensor_colors": {
-        "Black": [0, 20],
-        "Wood": [40, 55],
-        "Red": [58, 75],
-        "White": [80, 100]
+        "Black": [0, 25],
+        "Wood": [30, 48],
+        "Red": [49, 70],
+        "White": [75, 100]
       },
       "pulses_per_cm": 35.2,
       "pulses_per_90_degrees": 490
@@ -41,10 +41,10 @@
       "match_hostname": "blue",
       "ip": "192.168.1.135",
       "sensor_colors": {
-        "Black": [0, 20],
-        "Wood": [50, 65],
-        "Red": [70, 85],
-        "White": [90, 100]
+        "Black": [0, 25],
+        "Wood": [35, 60],
+        "Red": [61, 85],
+        "White": [86, 100]
       },
       "pulses_per_cm": 35.2,
       "pulses_per_90_degrees": 490
