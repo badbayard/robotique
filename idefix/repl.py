@@ -114,6 +114,22 @@ class WallCommand(REPLCommand):
 
 
 @command
+class WallCommand(REPLCommand):
+    NAME = 'all_walls'
+    SHORTHAND = 'w*'
+
+    def __call__(self, ctx: REPLContext, *args, **kwargs):
+        board = Board(8, 8)
+        ctx.bot.write_info(board)
+        walls = ''
+        walls += board[ctx.bot.pos].wall(Direction.North).value
+        walls += board[ctx.bot.pos].wall(Direction.East).value
+        walls += board[ctx.bot.pos].wall(Direction.South).value
+        walls += board[ctx.bot.pos].wall(Direction.West).value
+        print(walls)
+
+
+@command
 class StopCommand(REPLCommand):
     NAME = 'stop'
     SHORTHAND = 'stop'
@@ -142,6 +158,16 @@ class DirectionCommand(REPLCommand):
             print("{} -> {}".format(olddir, ctx.bot.dir))
         except IndexError:
             print(ctx.bot.dir)
+
+
+@command
+class EmergencyStopCommand(REPLCommand):
+    NAME = 'emerstop'
+    SHORTHAND = 'es'
+    DOC = "Enale or disable emergency stop"
+
+    def __call__(self, ctx: REPLContext, *args, **kwargs):
+        ctx.bot.emergency_stop(args[0] == '1')
 
 
 @command

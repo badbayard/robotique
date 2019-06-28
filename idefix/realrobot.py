@@ -56,7 +56,7 @@ class RealBot(Bot):
     ROTATE_PULSES_SLOWDOWN_PER_STAY = 40
     ROTATE_SLOWDOWN_SPEED = 70
     CM_PER_CELL = 30
-    DISTANCE_TO_WALL = 6
+    DISTANCE_TO_WALL = 10
 
     def __init__(self, motor_l: LargeMotor, motor_r: LargeMotor,
                  distance_l: Optional[UltrasonicSensor],
@@ -77,6 +77,7 @@ class RealBot(Bot):
         self.calibration = calibration
         self.rotate_stays = 0
         self.last_rotation_reldir = None
+        self.enable_emergency_stop = False
 
     def read_color(self) -> BoardColor:
         return BoardColor.from_itensity(
@@ -91,6 +92,12 @@ class RealBot(Bot):
 
     def move_cm_color(self, cm: float, speed: float):
         self.rotate_stays = 0
+        min_wall_dist = 7
+        if self.enable_emergency_stop:
+            fdist = self.distance_f.value() / 10
+            print(" D=" + str(fdist))
+            if fdist < min_wall_dist:
+                return
         end = self.motor_l.position + self.calibration.pulses_per_cm * cm
         correct_dir = None
         if self.last_rotation_reldir in (RelativeDirection.Left, None):
@@ -101,6 +108,11 @@ class RealBot(Bot):
             self.motor_r.run_forever(speed_sp=speed - self.CORRECT_SPEED)
         col_counter = ConsecutiveCounter(25)
         while self.motor_l.position <= end:
+            if self.enable_emergency_stop:
+                fdist = self.distance_f.value() / 10
+                print(" D=" + str(fdist))
+                if fdist < min_wall_dist:
+                    break
             col = self.read_color()
             col_counter(col)
             col_counter.print()
@@ -296,18 +308,21 @@ class RealBot(Bot):
             '''self.distance_l.mode = 'US-DIST-CM'
             self.distance_f.mode = 'US-LISTEN'
             self.distance_r.mode = 'US-LISTEN'''
-            return Wall.Yes if self.distance_l.value() < 10 else Wall.No
+            return Wall.Yes if self.distance_l.value() < 13 else Wall.No
         elif dir == RelativeDirection.Right:
             if self.distance_r is None:
                 return Wall.Unknown
             '''self.distance_l.mode = 'US-LISTEN'
             self.distance_f.mode = 'US-LISTEN'
             self.distance_r.mode = 'US-DIST-CM'''
-            return Wall.Yes if self.distance_r.value() < 10 else Wall.No
+            return Wall.Yes if self.distance_r.value() < 13 else Wall.No
         return Wall.Unknown
 
     def write_info(self, board: Board, *args, **kwargs):
         raise NotImplementedError
+
+    def emergency_stop(self, enable: bool):
+        self.enable_emergency_stop = enable
 
 
 CALIBRATION_JSON_FILENAME = 'robots.json'

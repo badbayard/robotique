@@ -20,10 +20,10 @@ class CmdServContext:
 
     def send(self, data: Union[bytes, str]):
         if isinstance(data, str):
-            print('< ' + data)
+            print('> ' + data)
             self.conn.send(data.encode('utf-8'))
         else:
-            print('< ' + data.decode('utf-8'))
+            print('> ' + data.decode('utf-8'))
             self.conn.send(data)
 
 
@@ -124,6 +124,20 @@ class WallCommand(CmdServCommand):
 
 
 @command
+class WallCommand(CmdServCommand):
+    NAME = 'all_wall'
+    SHORTHAND = b'w*'
+
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
+        walls = ''
+        walls += ctx.bot.wall(Direction.North).value
+        walls += ctx.bot.wall(Direction.East).value
+        walls += ctx.bot.wall(Direction.South).value
+        walls += ctx.bot.wall(Direction.West).value
+        ctx.send(walls)
+
+
+@command
 class StopCommand(CmdServCommand):
     NAME = 'stop'
     SHORTHAND = b'stop'
@@ -159,6 +173,15 @@ class DirectionCommand(CmdServCommand):
                 Direction.Unknown: b'?'
             }
             ctx.send(dirmap[ctx.bot.dir])
+
+
+@command
+class EmergencyStopCommand(CmdServCommand):
+    NAME = 'emerstop'
+    SHORTHAND = b'es'
+
+    def __call__(self, ctx: CmdServContext, *args, **kwargs):
+        ctx.bot.emergency_stop(args[0] == b'1')
 
 
 @command
@@ -226,6 +249,7 @@ if __name__ == '__main__':
         try:
             connection, address = s.accept()  # connection is a new socket
             connection.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
+            print("Accepted ({}, {})".format(connection, address))
             repl(CmdServContext(b, bot, connection))
         except BrokenPipeError:
             print("Broken pipe!")

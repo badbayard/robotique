@@ -5,6 +5,7 @@ from flask import render_template, Markup, jsonify, request
 
 from idefix import Board, FakeBot, Bot, Wall, Direction, Position, boardgen, \
     RelativeDirection, discovery
+from idefix.remote import RemoteBot
 from idefix.proxy import ProxyBot, Instruction, Command
 from idefix.webui import app
 
@@ -92,7 +93,7 @@ class HTMLTableBoardView:
 class Context:
     def __init__(self):
         self.realboard = None  # type: Board
-        self.board = None  # type: Board
+        self.board = Board(8, 8)  # type: Board
         self.red = None  # type: ProxyBot
         self.green = None  # type: ProxyBot
         self.blue = None  # type: ProxyBot
@@ -103,16 +104,43 @@ class Context:
         self.destination = None  # type: Optional[Position]
         self.destbot = None  # type: Optional[Bot]
         self.instr_idx = 0
+        self.realworld = True
+
+    def get_red(self):
+        if self.realworld:
+            red = RemoteBot('red')
+            #red.emergency_stop(True)
+        else:
+            red = FakeBot(
+                self.realboard, name='red', color=[255, 0, 0])
+        red.dir = Direction.North
+        return red
+
+    def get_green(self):
+        if self.realworld:
+            green = RemoteBot('green')
+        else:
+            green = FakeBot(
+                self.board, name='green', color=[0, 255, 0])
+        return green
+
+    def get_blue(self):
+        if self.realworld:
+            blue = RemoteBot('blue')
+        else:
+            blue = FakeBot(
+                self.board, name='blue', color=[0, 0, 255])
+        return blue
+
+    def start(self):
+        red = self.get_red()
+        # red.write_info(self.board)
+        self.red = ProxyBot(red)
+        self.bots = [self.red]
+        self.disc = discovery.run(self.board, self.red)
 
     def make_board_discovery(self):
         self.realboard = boardgen.generate_board(8, 8)
-        self.board = Board(8, 8)
-        fakebot = FakeBot(self.realboard)
-        fakebot.dir = Direction.East
-        fakebot.write_info(self.board)
-        self.red = ProxyBot(fakebot)
-        self.bots = [self.red]
-        self.disc = discovery.run(self.board, self.red)
 
     def _find_empty_cell(self):
         for y in range(self.board.min_y, self.board.max_y + 1):
@@ -124,13 +152,12 @@ class Context:
                 return cell
 
     def prepare_game(self):
+        #self.red.emergency_stop(False)
         for y in range(self.board.min_y, self.board.max_y + 1):
             for x in range(self.board.min_x, self.board.max_x + 1):
                 self.board[Position(x, y)].explored_by = None
-        self.green = ProxyBot(FakeBot(
-            self.board, name='green', color=[0, 255, 0]))
-        self.blue = ProxyBot(FakeBot(
-            self.board, name='blue', color=[0, 0, 255]))
+        self.green = ProxyBot(self.get_green())
+        self.blue = ProxyBot(self.get_blue())
         self.bots = [self.red, self.green, self.blue]
         self.green.pos = self._find_empty_cell().pos
         self.blue.pos = self._find_empty_cell().pos
@@ -187,18 +214,28 @@ class Context:
             bot.write_info(inst.args[0])
 
 
-ctx = Context()
-ctx.make_board_discovery()
+_ctx = None  # type: Optional[Context]
+
+
+def get_ctx(mkboard=False) -> Context:
+    global _ctx
+    if _ctx is None:
+        _ctx = Context()
+        if mkboard:
+            _ctx.make_board_discovery()
+        _ctx.start()
+    return _ctx
 
 
 def _render(commands: Optional[List[Instruction]] = None,
             discovery_end: Optional[bool] = None,
             game_end: Optional[bool] = None):
+    ctx = get_ctx()
     view = HTMLTableBoardView(ctx.board, ctx.bots, ctx.destination, ctx.destbot)
-    viewreal = HTMLTableBoardView(ctx.realboard, ctx.bots, ctx.destination, ctx.destbot)
+    #viewreal = HTMLTableBoardView(ctx.realboard, ctx.bots, ctx.destination, ctx.destbot)
     json = {
         'board': view.render(),
-        'realboard': viewreal.render()
+        'realboard': '' #viewreal.render()
     }
     if commands is not None:
         json['commands'] = [c.to_json_dict() for c in commands]
@@ -211,12 +248,14 @@ def _render(commands: Optional[List[Instruction]] = None,
 
 @app.route('/')
 def index():
+    ctx = get_ctx()
     view = HTMLTableBoardView(ctx.board, ctx.bots, ctx.destination, ctx.destbot)
     return render_template("index.html", board1=Markup(view.render()))
 
 
 @app.route('/step_discovery')
 def step_discovery():
+    ctx = get_ctx()
     try:
         commands = next(ctx.disc)
     except StopIteration:
@@ -226,6 +265,7 @@ def step_discovery():
 
 @app.route('/auto_discovery')
 def auto_discovery():
+    ctx = get_ctx()
     commands = []
     try:
         while True:
@@ -237,20 +277,22 @@ def auto_discovery():
 
 @app.route('/reset')
 def reset():
-    global ctx
-    ctx = Context()
-    ctx.make_board_discovery()
+    global _ctx
+    _ctx = Context()
+    _ctx.make_board_discovery()
     return _render()
 
 
 @app.route('/prepare_game')
 def prepare_game():
+    ctx = get_ctx()
     ctx.prepare_game()
     return _render()
 
 
 @app.route('/place_bot')
 def place_bot():
+    ctx = get_ctx()
     x = int(request.args.get('x'))
     y = int(request.args.get('y'))
     botname = request.args.get('bot')
@@ -267,6 +309,7 @@ def place_bot():
 
 @app.route('/place_dest')
 def place_dest():
+    ctx = get_ctx()
     x = int(request.args.get('x'))
     y = int(request.args.get('y'))
     botname = request.args.get('bot')
@@ -277,6 +320,7 @@ def place_dest():
 
 @app.route('/start_game')
 def start_game():
+    ctx = get_ctx()
     rgame = rm.Game(ctx.board, ctx.bots, ctx.destination, ctx.destbot)
     ctx.raw_instructions = rr.search(rgame)
     ctx.translate_instructions()
@@ -285,6 +329,7 @@ def start_game():
 
 @app.route('/step_game')
 def step_game():
+    ctx = get_ctx()
     inst = ctx.instructions[ctx.instr_idx]
     ctx.execute_instruction(inst)
     commands = [inst]

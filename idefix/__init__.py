@@ -373,6 +373,9 @@ class Bot(ABC):
     def write_info(self, board: Board, *args, **kwargs):
         ...
 
+    def emergency_stop(self, enable: bool):
+        ...
+
 
 class RealWorldError(RuntimeError):
     pass
